@@ -5,6 +5,8 @@ import (
 	"strings"
 )
 
+var AllMonths = []string{"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"}
+
 type intVsInt func(int, int) bool
 
 func IsGreater(x int, y int) bool {

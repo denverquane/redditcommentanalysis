@@ -17,20 +17,23 @@ const RunServer = false
 
 var PendingSearchCriteria = selection.MakeEmptySearchParams()
 
-const SubA = "christianity"
-const SubB = "atheism"
+const SubA = "dogs"
+const SubB = "aww"
 
 func main() {
 
 	if RunServer {
 		log.Fatal(run())
 	} else {
-		begin := time.Now()
-		searchCriteria := selection.MakeSimpleSearchParams("2016", []string{"Feb", "Apr"}, 0, []string{"\"subreddit\":\"" + SubA + "\"", "\"subreddit\":\"" + SubB + "\""})
-		allMonths := selection.FilterAllMonthsComments(searchCriteria, BaseDataDirectory)
-		selection.CompareSubreddits(allMonths, SubA, SubB)
-		total := time.Now().Sub(begin).String()
-		fmt.Println("Took " + total + " for " + searchCriteria.ToString())
+		//begin := time.Now()
+		//searchCriteria := selection.MakeSimpleSearchParams("2016", []string{"Jan"}, 0,
+		//	[]string{"\"subreddit\":\"" + SubA + "\"", "\"subreddit\":\"" + SubB + "\""}, []string{})
+		//allMonths := selection.FilterAllMonthsComments(searchCriteria, BaseDataDirectory)
+		//selection.CompareSubreddits(allMonths, SubA, SubB)
+		selection.AuthorSubredditStats("mrsoupsox", BaseDataDirectory)
+
+		//total := time.Now().Sub(begin).String()
+		//fmt.Println("Took " + total + " for " + searchCriteria.ToString())
 	}
 }
 
@@ -59,8 +62,6 @@ func makeMuxRouter() http.Handler {
 	muxRouter.HandleFunc("/setCriteria", handleSetCriteria).Methods("POST")
 
 	muxRouter.HandleFunc("/run", handleRunCommand).Methods("GET")
-
-	// muxRouter.HandleFunc("/results", handleGetLastResults).Methods("GET")
 
 	return muxRouter
 }
@@ -108,23 +109,3 @@ func handleRunCommand(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Access-Control-Allow-Headers", "Content-Type")
 	io.WriteString(w, string(text))
 }
-
-//
-//func handleGetLastResults(w http.ResponseWriter, r *http.Request) {
-//	var bytes []byte
-//	var err error
-//	if results != nil {
-//		bytes, err = json.Marshal(&results)
-//		if err != nil {
-//			log.Println(err)
-//		}
-//	}
-//
-//	w.WriteHeader(http.StatusOK)
-//
-//	fmt.Println("GET last results")
-//	w.Header().Set("Access-Control-Allow-Origin", "*")
-//	w.Header().Add("Access-Control-Allow-Methods", "PUT")
-//	w.Header().Add("Access-Control-Allow-Headers", "Content-Type")
-//	io.WriteString(w, string(bytes))
-//}

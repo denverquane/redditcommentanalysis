@@ -10,23 +10,18 @@ import (
 )
 
 type SubredditSplitScores struct {
-	A_Scores []int64
-	B_Scores []int64
+	A_Scores     []int64
+	B_Scores     []int64
+	Total_Scores []int64 //what all the comments look like for a user
 }
 
+//NOTE changing this datamodel can invalidate older or future data captures...
 var commentFields = map[string]string{
 	"author":    "str",
 	"subreddit": "str",
-	//"body":      "str",
-	"score":  "int",
-	"gilded": "int",
-}
-
-func FilterMonthWorker(criteria *SearchParams, month string, baseDir string, c chan []map[string]string) {
-	log.Println("Started worker for: " + month)
-	data := OpenCachedOrProcessAndFilterMonth(criteria, month, baseDir)
-	c <- data
-	log.Println(month + " worker finished")
+	"body":      "str",
+	"score":     "int",
+	"gilded":    "int",
 }
 
 func OpenCachedOrProcessAndFilterMonth(searchCriteria *SearchParams, month string, BaseDir string) []map[string]string {
@@ -70,18 +65,60 @@ func OpenCachedOrProcessAndFilterMonth(searchCriteria *SearchParams, month strin
 
 func FilterAllMonthsComments(searchCriteria *SearchParams, baseDir string) []map[string]string {
 	allMonthsComments := make([]map[string]string, 0)
-	totalMonths := len(searchCriteria.months)
 
-	ch := make(chan []map[string]string, totalMonths)
 	for _, v := range searchCriteria.months {
-		go FilterMonthWorker(searchCriteria, v, baseDir, ch)
-	}
-
-	for i := 0; i < totalMonths; i++ {
-		allMonthsComments = append(allMonthsComments, <-ch...)
+		allMonthsComments = append(allMonthsComments, OpenCachedOrProcessAndFilterMonth(searchCriteria, v, baseDir)...)
 	}
 
 	return allMonthsComments
+}
+
+func AuthorSubredditStats(author string, baseDir string) {
+	ANDList := []string{"\"author\":\"" + author + "\""}
+
+	searchCriteria := MakeSimpleSearchParams("2016", AllMonths, 0, []string{}, ANDList)
+	data := FilterAllMonthsComments(searchCriteria, baseDir)
+
+	totalComments := len(data)
+	subredditScores := make(map[string][]int64, 0)
+	totalScores := make([]int64, totalComments)
+
+	for _, v := range data {
+		if val, ok := subredditScores[v["subreddit"]]; ok {
+			num, err := strconv.ParseInt(v["score"], 10, 64)
+			if err != nil {
+				log.Println(err)
+			}
+			subredditScores[v["subreddit"]] = append(val, num)
+		} else {
+			subredditScores[v["subreddit"]] = make([]int64, 1)
+			num, err := strconv.ParseInt(v["score"], 10, 64)
+			if err != nil {
+				log.Println(err)
+			}
+			subredditScores[v["subreddit"]][0] = num
+		}
+		num, err := strconv.ParseInt(v["score"], 10, 64)
+		if err != nil {
+			log.Println(err)
+		}
+		totalScores = append(totalScores, num)
+	}
+	fmt.Println("Total comments: " + strconv.Itoa(totalComments))
+
+	var totalSum int64 = 0
+
+	for _, v := range totalScores {
+		totalSum += v
+	}
+	for key, sub := range subredditScores {
+		var subredditSum int64 = 0
+		fmt.Println("Subreddit ratio: " + strconv.FormatFloat(float64(len(sub))/float64(totalComments), 'f', 3, 64))
+		for _, v := range sub {
+			subredditSum += v
+		}
+		fmt.Println("Subreddit " + key + " score ratio: " + strconv.FormatFloat(float64(subredditSum)/float64(totalSum), 'f', 3, 64))
+	}
 }
 
 func CompareSubreddits(allComments []map[string]string, subA string, subB string) {
@@ -89,7 +126,7 @@ func CompareSubreddits(allComments []map[string]string, subA string, subB string
 	for i, comment := range allComments { //individual comment
 		author := comment["author"]
 		if _, ok := authorsInEither[author]; !ok {
-			authorsInEither[author] = SubredditSplitScores{make([]int64, 0), make([]int64, 0)}
+			authorsInEither[author] = SubredditSplitScores{make([]int64, 0), make([]int64, 0), make([]int64, 0)}
 		}
 		if i%100000 == 0 {
 			fmt.Println("Done checking " + strconv.Itoa(i) + " comments")
@@ -111,9 +148,10 @@ func CompareSubreddits(allComments []map[string]string, subA string, subB string
 	var total = 0
 	var aAvgs = make([]float64, 0)
 	var bAvgs = make([]float64, 0)
-	fmt.Println("Only including users with more than 10 posts in each subreddit")
+	var threshold = 20
+	fmt.Println("Only including users with more than " + strconv.Itoa(threshold) + " posts in each subreddit")
 	for _, v := range authorsInEither {
-		if len(v.A_Scores) > 1 && len(v.B_Scores) > 1 { //comment to both...
+		if len(v.A_Scores) > threshold && len(v.B_Scores) > threshold { //comment to both...
 			aAvg := average(v.A_Scores)
 			bAvg := average(v.B_Scores)
 			//get the average of all comments for a user in each subreddit

@@ -101,9 +101,9 @@ func MakeEmptySearchParams() *SearchParams {
 		make([]IntCriteria, 0), make([]IntCriteria, 0)}
 }
 
-func MakeSimpleSearchParams(year string, months []string, limit uint64, ORs []string) *SearchParams {
+func MakeSimpleSearchParams(year string, months []string, limit uint64, ORs []string, ANDs []string) *SearchParams {
 	return &SearchParams{year, months, limit,
-		ORs, make([]string, 0),
+		ORs, ANDs,
 		make([]IntCriteria, 0), make([]IntCriteria, 0)}
 }
 
@@ -115,10 +115,6 @@ func (param SearchParams) IsReady() (bool, string) {
 	}
 	return true, "Ready!"
 }
-
-//func formatSearchPair(key string, val string) string {
-//	return "\"" + key + "\":\"" + val + "\""
-//}
 
 func getCommentDataFromLine(line []byte, keyTypes map[string]string) map[string]string {
 	result := make(map[string]string, 0)
