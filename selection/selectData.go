@@ -3,9 +3,11 @@ package selection
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"github.com/valyala/fastjson"
 	"log"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -14,58 +16,122 @@ import (
 
 const HundredThousand = 100000
 const OneMillion = 1000000
+const TenMillion = 10000000
 
 type SearchParams struct {
-	year                string
-	month               string
-	lineLimit           uint64
-	formattedORQueries  []string
-	formattedANDQueries []string
+	year             string
+	months           []string
+	lineLimit        uint64
+	stringORQueries  []string
+	stringANDQueries []string
+	intORQueries     []IntCriteria
+	intANDQueries    []IntCriteria
 }
 
-func MakeSimpleSearchParams(year string, month string) SearchParams {
-	return SearchParams{year, month, OneMillion,
-		make([]string, 0), make([]string, 0)}
-}
-
-func (params *SearchParams) AddANDCriteria(key string, val string) *SearchParams {
-	params.formattedANDQueries = append(params.formattedANDQueries, makeFormattedSearchPair(key, val))
-	return params
-}
-
-func (params *SearchParams) AddORCriteria(key string, val string) *SearchParams {
-	params.formattedORQueries = append(params.formattedORQueries, makeFormattedSearchPair(key, val))
-	return params
-}
-
-func makeFormattedSearchPair(key string, val string) string {
-	return "\"" + key + "\":\"" + val + "\""
-}
-
-type BasicCommentData struct {
-	author    string
-	subreddit string
-	body      string
-	score     int
-}
-
-func (bcd BasicCommentData) ToString() string {
+func (params SearchParams) ToString() string {
 	var buffer bytes.Buffer
-	buffer.WriteString("{\n")
-	buffer.WriteString("Author: " + bcd.author + "\n")
-	buffer.WriteString("Subreddit: " + bcd.subreddit + "\n")
-	buffer.WriteString("Body: " + bcd.body + "\n")
-	buffer.WriteString("Score: " + strconv.Itoa(bcd.score) + "\n")
-	buffer.WriteString("}")
+	buffer.WriteString("{")
+	buffer.WriteString("\nyear: " + params.year)
+	buffer.WriteString("\nmonths: \n[")
+	for _, v := range params.months {
+		buffer.WriteString("\n" + v)
+	}
+	buffer.WriteString("\n]")
+	buffer.WriteString("\nlinelimit: " + strconv.FormatUint(params.lineLimit, 10))
+	buffer.WriteString("\nORQueries: \n[")
+	for _, v := range params.stringORQueries {
+		buffer.WriteString("\n" + v)
+	}
+	buffer.WriteString("\n]")
+	buffer.WriteString("\nANDQueries: \n[")
+	for _, v := range params.stringANDQueries {
+		buffer.WriteString("\n" + v)
+	}
+	buffer.WriteString("\n]")
 	return buffer.String()
 }
 
-func getCommentDataFromLine(line []byte) BasicCommentData {
-	var result BasicCommentData
-	result.author = fastjson.GetString(line, "author")
-	result.body = fastjson.GetString(line, "body")
-	result.subreddit = fastjson.GetString(line, "subreddit")
-	result.score = fastjson.GetInt(line, "score")
+func (params SearchParams) ValuesToString() string {
+	var buffer bytes.Buffer
+	buffer.WriteString(params.year + "_")
+	for _, v := range params.months {
+		buffer.WriteString(v + "_")
+	}
+	buffer.WriteString(strconv.FormatUint(params.lineLimit, 10) + "_")
+	for _, v := range params.stringORQueries {
+		str := strings.Replace(v, "\"", "", -1) + "_"
+		buffer.WriteString(strings.Replace(str, ":", "", -1) + "_")
+	}
+
+	for _, v := range params.stringANDQueries {
+		str := strings.Replace(v, "\"", "", -1) + "_"
+		buffer.WriteString(strings.Replace(str, ":", "", -1) + "_")
+	}
+	return buffer.String()
+}
+
+type SimpleSearchCriteria struct {
+	Year             string
+	Months           []string
+	LineLimit        int
+	StringORQueries  []string
+	StringANDQueries []string
+}
+
+func InterpretFromHttp(r *http.Request) *SearchParams {
+	params := MakeEmptySearchParams()
+	var message SimpleSearchCriteria
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&message); err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(message)
+	params.year = message.Year
+	params.months = message.Months
+	params.lineLimit = uint64(message.LineLimit)
+	params.stringORQueries = message.StringORQueries
+	params.stringANDQueries = message.StringANDQueries
+	fmt.Println(params)
+	return params
+}
+
+func MakeEmptySearchParams() *SearchParams {
+	return &SearchParams{"", make([]string, 0), 0,
+		make([]string, 0), make([]string, 0),
+		make([]IntCriteria, 0), make([]IntCriteria, 0)}
+}
+
+func MakeSimpleSearchParams(year string, months []string, limit uint64, ORs []string) *SearchParams {
+	return &SearchParams{year, months, limit,
+		ORs, make([]string, 0),
+		make([]IntCriteria, 0), make([]IntCriteria, 0)}
+}
+
+func (param SearchParams) IsReady() (bool, string) {
+	if param.year == "" {
+		return false, "You haven't specified a search year"
+	} else if len(param.months) == 0 && param.lineLimit == 0 {
+		return false, "You haven't specified a search month, or a line limit number!"
+	}
+	return true, "Ready!"
+}
+
+//func formatSearchPair(key string, val string) string {
+//	return "\"" + key + "\":\"" + val + "\""
+//}
+
+func getCommentDataFromLine(line []byte, keyTypes map[string]string) map[string]string {
+	result := make(map[string]string, 0)
+
+	for key, v := range keyTypes {
+		if v == "str" {
+			result[key] = strings.ToLower(fastjson.GetString(line, key))
+		} else if v == "int" {
+			result[key] = strconv.Itoa(fastjson.GetInt(line, key))
+		} else {
+			log.Fatal("Undetected type: " + v)
+		}
+	}
 	return result
 }
 
@@ -116,74 +182,51 @@ func monthToIntString(month string) string {
 	}
 }
 
-func OpenAndSearchFile(params SearchParams, baseDataDirectory string) []BasicCommentData {
-	var buffer bytes.Buffer
-	buffer.Write([]byte(baseDataDirectory))
-	buffer.Write([]byte("/RC_" + params.year + monthToIntString(params.month)))
-	file, fileOpenErr := os.Open(buffer.String())
+func OpenAndSearchFile(params SearchParams, baseDataDirectory string, commentFields map[string]string) []map[string]string {
+	relevantComments := make([]map[string]string, 0)
+	for _, v := range params.months {
+		var buffer bytes.Buffer
+		buffer.Write([]byte(baseDataDirectory))
+		buffer.Write([]byte("/RC_" + params.year + monthToIntString(v)))
+		file, fileOpenErr := os.Open(buffer.String())
 
-	if fileOpenErr != nil {
-		fmt.Print(fileOpenErr)
-		os.Exit(0)
+		if fileOpenErr != nil {
+			fmt.Print(fileOpenErr)
+			os.Exit(0)
+		}
+		reader := bufio.NewReaderSize(file, 4096)
+
+		fmt.Println("Opened file " + buffer.String())
+
+		var linesRead uint64 = 0
+
+		startTime := time.Now()
+
+		for {
+			if linesRead > 0 && linesRead == params.lineLimit {
+				log.Println("Reached line limit, concluding analysis")
+				break
+			}
+
+			line := recurseBuildCompleteLine(reader)
+			if line == nil {
+				log.Println("Encountered error; concluding analysis")
+				break
+			}
+			linesRead++
+
+			if meetsCriteria(string(line), params.stringORQueries, params.stringANDQueries) &&
+				meetsIntCriteria(line, params.intORQueries, params.intANDQueries) {
+				parsed := getCommentDataFromLine(line, commentFields)
+				relevantComments = append(relevantComments, parsed)
+			}
+
+			if linesRead%HundredThousand == 0 {
+				fmt.Println("Read " + strconv.FormatUint(linesRead, 10) + " lines so far")
+			}
+		}
+		dif := time.Now().Sub(startTime).String()
+		fmt.Println("Took " + dif + " to search " + strconv.FormatUint(linesRead, 10) + " comments of file " + buffer.String())
 	}
-	reader := bufio.NewReaderSize(file, 4096)
-
-	fmt.Println("Opened file " + buffer.String())
-
-	var linesRead uint64 = 0
-	relevantComments := make([]BasicCommentData, 0)
-
-	startTime := time.Now()
-
-	for {
-		if linesRead > 0 && linesRead == params.lineLimit {
-			log.Println("Reached line limit, concluding analysis")
-			break
-		}
-
-		line := recurseBuildCompleteLine(reader)
-		if line == nil {
-			log.Println("Encountered error; concluding analysis")
-			break
-		}
-		linesRead++
-
-		if meetsCriteria(string(line), params.formattedORQueries, params.formattedANDQueries) {
-			parsed := getCommentDataFromLine(line)
-			relevantComments = append(relevantComments, parsed)
-		}
-
-		if linesRead%HundredThousand == 0 {
-			fmt.Println("Read " + strconv.FormatUint(linesRead, 10) + " lines so far")
-		}
-	}
-	dif := time.Now().Sub(startTime).String()
-	fmt.Println("Took " + dif + " to search " + strconv.FormatUint(linesRead, 10) + " comments of file " + buffer.String())
 	return relevantComments
-}
-
-func meetsCriteria(line string, ORs []string, ANDs []string) bool {
-	var metCriteria bool
-	if len(ORs) > 0 {
-		metCriteria = false
-	} else {
-		metCriteria = true //no ORs to test- automatically valid until AND step
-	}
-
-	for _, v := range ORs {
-		if strings.Contains(line, v) {
-			metCriteria = true //met a SINGLE one of the OR criteria; continues on
-			break
-		}
-	}
-	if !metCriteria { //failed all the ORs
-		return false
-	}
-
-	for _, v := range ANDs {
-		if !strings.Contains(line, v) {
-			return false
-		}
-	}
-	return true
 }
