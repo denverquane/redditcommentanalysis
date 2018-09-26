@@ -185,11 +185,23 @@ func OpenAndSearchFile(params SearchParams, baseDataDirectory string, commentFie
 		buffer.Write([]byte(baseDataDirectory))
 		buffer.Write([]byte("/RC_" + params.year + monthToIntString(v)))
 		file, fileOpenErr := os.Open(buffer.String())
+		metafile, fileOpenErr2 := os.Open(buffer.String() + "_meta.txt")
 
 		if fileOpenErr != nil {
 			fmt.Print(fileOpenErr)
 			os.Exit(0)
 		}
+		var totalLines uint64
+
+		if fileOpenErr2 != nil {
+			totalLines = 0
+			metafile.Close()
+		} else {
+			rdr := bufio.NewReader(metafile)
+			line, _, _ := rdr.ReadLine()
+			totalLines, _ = strconv.ParseUint(string(line), 10, 64)
+		}
+
 		reader := bufio.NewReaderSize(file, 4096)
 
 		fmt.Println("Opened file " + buffer.String())
@@ -206,6 +218,7 @@ func OpenAndSearchFile(params SearchParams, baseDataDirectory string, commentFie
 
 			line := recurseBuildCompleteLine(reader)
 			if line == nil {
+				fmt.Println("Lines: " + strconv.FormatUint(linesRead, 10))
 				log.Println("Encountered error; concluding analysis")
 				break
 			}
@@ -218,7 +231,13 @@ func OpenAndSearchFile(params SearchParams, baseDataDirectory string, commentFie
 			}
 
 			if linesRead%HundredThousand == 0 {
-				fmt.Println("Read " + strconv.FormatUint(linesRead, 10) + " lines so far")
+				if totalLines != 0 {
+					percentDone := (float64(linesRead) / float64(totalLines)) * 100.0
+					fmt.Println(strconv.FormatFloat(percentDone, 'f', 2, 64) + "%")
+				} else {
+					fmt.Println(strconv.FormatUint(linesRead, 10))
+				}
+
 			}
 		}
 		dif := time.Now().Sub(startTime).String()

@@ -1,6 +1,7 @@
 package selection
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -24,11 +25,11 @@ var commentFields = map[string]string{
 	"gilded":    "int",
 }
 
-func OpenCachedOrProcessAndFilterMonth(searchCriteria *SearchParams, month string, BaseDir string) []map[string]string {
+func OpenCachedOrProcessAndFilterMonth(searchCriteria *SearchParams, month string, BaseDir string, suffix string) []map[string]string {
 	var commentData []map[string]string
 	searchCriteria.months = []string{month} //make sure the saved file only refers to this month specifically
 	res := searchCriteria.ValuesToString()
-	dir := BaseDir + "/" + month + "/" + res
+	dir := BaseDir + "/" + month + "/" + res + suffix
 	fmt.Println(dir)
 
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
@@ -63,21 +64,21 @@ func OpenCachedOrProcessAndFilterMonth(searchCriteria *SearchParams, month strin
 	return commentData
 }
 
-func FilterAllMonthsComments(searchCriteria *SearchParams, baseDir string) []map[string]string {
+func FilterAllMonthsComments(searchCriteria *SearchParams, baseDir, suffix string) []map[string]string {
 	allMonthsComments := make([]map[string]string, 0)
 
 	for _, v := range searchCriteria.months {
-		allMonthsComments = append(allMonthsComments, OpenCachedOrProcessAndFilterMonth(searchCriteria, v, baseDir)...)
+		allMonthsComments = append(allMonthsComments, OpenCachedOrProcessAndFilterMonth(searchCriteria, v, baseDir, suffix)...)
 	}
 
 	return allMonthsComments
 }
 
-func AuthorSubredditStats(author string, baseDir string) {
+func AuthorSubredditStats(author string, baseDir string) string {
 	ANDList := []string{"\"author\":\"" + author + "\""}
 
 	searchCriteria := MakeSimpleSearchParams("2016", AllMonths, 0, []string{}, ANDList)
-	data := FilterAllMonthsComments(searchCriteria, baseDir)
+	data := FilterAllMonthsComments(searchCriteria, baseDir, "allSubreddits")
 
 	totalComments := len(data)
 	subredditScores := make(map[string][]int64, 0)
@@ -104,7 +105,8 @@ func AuthorSubredditStats(author string, baseDir string) {
 		}
 		totalScores = append(totalScores, num)
 	}
-	fmt.Println("Total comments: " + strconv.Itoa(totalComments))
+	var buffer bytes.Buffer
+	buffer.Write([]byte("Total comments: " + strconv.Itoa(totalComments)))
 
 	var totalSum int64 = 0
 
@@ -113,12 +115,13 @@ func AuthorSubredditStats(author string, baseDir string) {
 	}
 	for key, sub := range subredditScores {
 		var subredditSum int64 = 0
-		fmt.Println("Subreddit ratio: " + strconv.FormatFloat(float64(len(sub))/float64(totalComments), 'f', 3, 64))
+		buffer.Write([]byte("Subreddit ratio: " + strconv.FormatFloat(float64(len(sub))/float64(totalComments), 'f', 3, 64)))
 		for _, v := range sub {
 			subredditSum += v
 		}
-		fmt.Println("Subreddit " + key + " score ratio: " + strconv.FormatFloat(float64(subredditSum)/float64(totalSum), 'f', 3, 64))
+		buffer.Write([]byte("Subreddit " + key + " score ratio: " + strconv.FormatFloat(float64(subredditSum)/float64(totalSum), 'f', 3, 64)))
 	}
+	return buffer.String()
 }
 
 func CompareSubreddits(allComments []map[string]string, subA string, subB string) {
