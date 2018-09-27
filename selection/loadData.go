@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math"
 	"os"
+	"sort"
 	"strconv"
 )
 
@@ -74,6 +76,53 @@ func FilterAllMonthsComments(searchCriteria *SearchParams, baseDir, suffix strin
 	return allMonthsComments
 }
 
+type subAndFloat struct {
+	subreddit string
+	percent   float64
+}
+
+type byLength []subAndFloat
+
+func (s byLength) Len() int {
+	return len(s)
+}
+
+func (s byLength) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (s byLength) Less(i, j int) bool {
+	return s[i].percent > s[j].percent
+}
+
+func SubredditStats(sub string, basedir string) string {
+	ANDList := []string{"\"subreddit\":\"" + sub + "\""}
+
+	searchCriteria := MakeSimpleSearchParams("2016", []string{"Jan", "Feb"}, 0, []string{}, ANDList)
+	data := FilterAllMonthsComments(searchCriteria, basedir, "")
+	totalComments := len(data)
+	var totalScore uint64 = 0
+
+	for _, v := range data {
+		num, err := strconv.ParseInt(v["score"], 10, 64)
+		if err != nil {
+			log.Println(err)
+		}
+		totalScore += uint64(num)
+	}
+	avgScore := float64(totalScore) / float64(totalComments)
+
+	avgAdjusted := 0.0
+	for _, v := range data {
+		num, _ := strconv.ParseInt(v["score"], 10, 64)
+		sqred := (float64(num) - avgScore) * (float64(num) - avgScore)
+		avgAdjusted += sqred
+	}
+	stdDev := math.Sqrt(avgAdjusted / float64(totalComments))
+
+	return sub + "," + strconv.FormatFloat(avgScore, 'f', 3, 64) + "," + strconv.FormatFloat(stdDev, 'f', 3, 64)
+}
+
 func AuthorSubredditStats(author string, baseDir string) string {
 	ANDList := []string{"\"author\":\"" + author + "\""}
 
@@ -106,7 +155,10 @@ func AuthorSubredditStats(author string, baseDir string) string {
 		totalScores = append(totalScores, num)
 	}
 	var buffer bytes.Buffer
-	buffer.Write([]byte("Total comments: " + strconv.Itoa(totalComments)))
+	buffer.Write([]byte("Total comments: " + strconv.Itoa(totalComments) + "\n"))
+
+	commentRatios := make([]subAndFloat, 0)
+	scoreRatios := make([]subAndFloat, 0)
 
 	var totalSum int64 = 0
 
@@ -114,12 +166,25 @@ func AuthorSubredditStats(author string, baseDir string) string {
 		totalSum += v
 	}
 	for key, sub := range subredditScores {
-		var subredditSum int64 = 0
-		buffer.Write([]byte("Subreddit ratio: " + strconv.FormatFloat(float64(len(sub))/float64(totalComments), 'f', 3, 64)))
+		var subredditSum float64 = 0
+
+		pair := subAndFloat{key, (float64(len(sub)) / float64(totalComments)) * 100.0}
+		commentRatios = append(commentRatios, pair)
 		for _, v := range sub {
-			subredditSum += v
+			subredditSum += float64(v)
 		}
-		buffer.Write([]byte("Subreddit " + key + " score ratio: " + strconv.FormatFloat(float64(subredditSum)/float64(totalSum), 'f', 3, 64)))
+		pair2 := subAndFloat{key, (float64(subredditSum) / float64(totalSum)) * 100.0}
+		scoreRatios = append(scoreRatios, pair2)
+	}
+	sort.Sort(byLength(commentRatios))
+	sort.Sort(byLength(scoreRatios))
+
+	for _, v := range commentRatios {
+		for _, vv := range scoreRatios {
+			if vv.subreddit == v.subreddit {
+				buffer.WriteString(v.subreddit + "," + strconv.FormatFloat(v.percent, 'f', 3, 64) + "," + strconv.FormatFloat(vv.percent, 'f', 3, 64) + "\n")
+			}
+		}
 	}
 	return buffer.String()
 }
