@@ -146,38 +146,6 @@ func recurseBuildCompleteLine(reader *bufio.Reader) []byte {
 	}
 }
 
-func monthToIntString(month string) string {
-	switch month {
-	case "Jan":
-		return "-01"
-	case "Feb":
-		return "-02"
-	case "Mar":
-		return "-03"
-	case "Apr":
-		return "-04"
-	case "May":
-		return "-05"
-	case "Jun":
-		return "-06"
-	case "Jul":
-		return "-07"
-	case "Aug":
-		return "-08"
-	case "Sep":
-		return "-09"
-	case "Oct":
-		return "-10"
-	case "Nov":
-		return "-11"
-	case "Dec":
-		return "-12"
-	default:
-		log.Println("Invalid month supplied; defaulting to january")
-		return "-01"
-	}
-}
-
 func OpenAndSearchFile(params SearchParams, baseDataDirectory string, commentFields map[string]string) []map[string]string {
 	relevantComments := make([]map[string]string, 0)
 	for _, v := range params.months {
@@ -244,4 +212,110 @@ func OpenAndSearchFile(params SearchParams, baseDataDirectory string, commentFie
 		fmt.Println("Took " + dif + " to search " + strconv.FormatUint(linesRead, 10) + " comments of file " + buffer.String())
 	}
 	return relevantComments
+}
+
+func SaveSubredditDataToFile(subreddit string, year string, basedir string) {
+	relevantComments := make([]map[string]string, 0)
+
+	for _, v := range AllMonths {
+		var buffer bytes.Buffer
+		buffer.Write([]byte(basedir))
+		buffer.Write([]byte("/RC_" + year + monthToIntString(v)))
+		file, fileOpenErr := os.Open(buffer.String())
+		metafile, fileOpenErr2 := os.Open(buffer.String() + "_meta.txt")
+
+		if fileOpenErr != nil {
+			fmt.Print(fileOpenErr)
+			os.Exit(0)
+		}
+		var totalLines uint64
+
+		if fileOpenErr2 != nil {
+			totalLines = 0
+			metafile.Close()
+		} else {
+			rdr := bufio.NewReader(metafile)
+			line, _, _ := rdr.ReadLine()
+			totalLines, _ = strconv.ParseUint(string(line), 10, 64)
+		}
+
+		reader := bufio.NewReaderSize(file, 4096)
+
+		fmt.Println("Opened file " + buffer.String())
+
+		var linesRead uint64 = 0
+
+		startTime := time.Now()
+
+		for {
+			line := recurseBuildCompleteLine(reader)
+			if line == nil {
+				fmt.Println("Lines: " + strconv.FormatUint(linesRead, 10))
+				log.Println("Encountered error; concluding analysis")
+				break
+			}
+			linesRead++
+
+			if strings.Contains(string(line), "\"subreddit\":\""+subreddit+"\"") {
+				parsed := getCommentDataFromLine(line, commentFields)
+				relevantComments = append(relevantComments, parsed)
+			}
+
+			if linesRead%HundredThousand == 0 {
+				if totalLines != 0 {
+					percentDone := (float64(linesRead) / float64(totalLines)) * 100.0
+					fmt.Println("Percent complete with " + v + ": " + strconv.FormatFloat(percentDone, 'f', 2, 64) + "%")
+				} else {
+					fmt.Println("Lines complete: " + strconv.FormatUint(linesRead, 10))
+				}
+
+			}
+		}
+		dif := time.Now().Sub(startTime).String()
+		fmt.Println("Took " + dif + " to search " + strconv.FormatUint(linesRead, 10) + " comments of file " + buffer.String())
+		f, err := os.Create(basedir + "/" + v + "/" + subreddit)
+		if err != nil {
+			log.Println(err)
+		}
+
+		bytess, err2 := json.Marshal(relevantComments)
+		if err2 != nil {
+			log.Println(err2)
+		}
+		f.Write(bytess)
+		f.Close()
+	}
+
+}
+
+func monthToIntString(month string) string {
+	switch month {
+	case "Jan":
+		return "-01"
+	case "Feb":
+		return "-02"
+	case "Mar":
+		return "-03"
+	case "Apr":
+		return "-04"
+	case "May":
+		return "-05"
+	case "Jun":
+		return "-06"
+	case "Jul":
+		return "-07"
+	case "Aug":
+		return "-08"
+	case "Sep":
+		return "-09"
+	case "Oct":
+		return "-10"
+	case "Nov":
+		return "-11"
+	case "Dec":
+		return "-12"
+	default:
+		log.Println("Invalid month supplied; defaulting to january")
+		return "-01"
+	}
 }

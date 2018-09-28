@@ -67,6 +67,7 @@ func makeMuxRouter() http.Handler {
 
 	muxRouter.HandleFunc("/runAuthorAnalysis/{author}", handleRunAuthor).Methods("GET")
 
+	muxRouter.HandleFunc("/extractSub/{subreddit}", handleExtractSub).Methods("GET")
 	muxRouter.HandleFunc("/runSubredditAnalysis/{subreddit}", handleRunSubreddit).Methods("GET")
 
 	muxRouter.HandleFunc("/authorStatus/{author}", handleGetAuthorStatus).Methods("GET")
@@ -94,6 +95,15 @@ func handleGetAuthorStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Access-Control-Allow-Methods", "PUT")
 	w.Header().Add("Access-Control-Allow-Headers", "Content-Type")
 	io.WriteString(w, str)
+}
+
+func handleExtractSub(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	subreddit := vars["subreddit"]
+	selection.SaveSubredditDataToFile(subreddit, "2016", BaseDataDirectory)
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Add("Access-Control-Allow-Methods", "PUT")
+	w.Header().Add("Access-Control-Allow-Headers", "Content-Type")
 }
 
 func handleGetSubredditStatus(w http.ResponseWriter, r *http.Request) {
