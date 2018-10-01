@@ -7,39 +7,29 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 )
 
 const BaseDataDirectory = "D:/Reddit_Data"
-const SSDBaseDataDirectory = "C:/Users/Denver"
 
 const RunServer = false
-
-var PendingSearchCriteria = selection.MakeEmptySearchParams()
-
-const SubA = "dogs"
-const SubB = "aww"
+const ServerPort = "5000"
 
 var authorStatusMap = make(map[string]string, 0)
 var subredditStatusMap = make(map[string]string, 0)
+var extractSubQueue = make([]string, 0)
 
 func main() {
 
 	if RunServer {
 		log.Fatal(run())
 	} else {
-		//begin := time.Now()
-		searchCriteria := selection.MakeSimpleSearchParams("2016", []string{"Feb"}, 0,
-			[]string{}, []string{"\"author\":\"" + "spez" + "\"", "\"subreddit\":\"" + "the_donald" + "\""})
-		allMonths := selection.FilterAllMonthsComments(searchCriteria, BaseDataDirectory, "")
-		fmt.Println(allMonths)
-		//selection.CompareSubreddits(allMonths, SubA, SubB)
-
-		//str := selection.AuthorSubredditStats("gallowboob", BaseDataDirectory)
-		//fmt.Println(str)
-
-		//total := time.Now().Sub(begin).String()
-		//fmt.Println("Took " + total + " for " + searchCriteria.ToString())
+		//searchCriteria := selection.MakeSimpleSearchParams("2016", []string{"Dec"}, 0,
+		//	[]string{}, []string{"\"subreddit\":\"" + "pics" + "\""})
+		//_ = selection.FilterAllMonthsComments(searchCriteria, BaseDataDirectory, "")
+		//fmt.Println(allMonths)
+		selection.OpenExtractedDatafile("//diskstation/downloads/2016", "funny", "Basic")
 	}
 }
 
@@ -47,7 +37,7 @@ func run() error {
 	handler := makeMuxRouter()
 
 	s := &http.Server{
-		Addr:           ":5050",
+		Addr:           ":" + ServerPort,
 		Handler:        handler,
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   10 * time.Second,
@@ -63,11 +53,10 @@ func run() error {
 func makeMuxRouter() http.Handler {
 	muxRouter := mux.NewRouter()
 
-	//muxRouter.HandleFunc("/", handleGetStatus).Methods("GET")
-
 	muxRouter.HandleFunc("/runAuthorAnalysis/{author}", handleRunAuthor).Methods("GET")
 
 	muxRouter.HandleFunc("/extractSub/{subreddit}", handleExtractSub).Methods("GET")
+	muxRouter.HandleFunc("/extractSub/status", handleExtractSubStatus).Methods("GET")
 	muxRouter.HandleFunc("/runSubredditAnalysis/{subreddit}", handleRunSubreddit).Methods("GET")
 
 	muxRouter.HandleFunc("/authorStatus/{author}", handleGetAuthorStatus).Methods("GET")
@@ -75,17 +64,6 @@ func makeMuxRouter() http.Handler {
 
 	return muxRouter
 }
-
-//
-//func handleGetStatus(w http.ResponseWriter, r *http.Request) {
-//	w.WriteHeader(http.StatusOK)
-//
-//	fmt.Println("GET status")
-//	w.Header().Set("Access-Control-Allow-Origin", "*")
-//	w.Header().Add("Access-Control-Allow-Methods", "PUT")
-//	w.Header().Add("Access-Control-Allow-Headers", "Content-Type")
-//	io.WriteString(w, PendingSearchCriteria.ToString())
-//}
 
 func handleGetAuthorStatus(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
@@ -97,10 +75,40 @@ func handleGetAuthorStatus(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, str)
 }
 
+func handleExtractSubStatus(w http.ResponseWriter, r *http.Request) {
+	str := ""
+	if len(extractSubQueue) > 0 {
+		str = "Currently processing " + extractSubQueue[0] + ", " + strconv.Itoa(len(extractSubQueue)-1) + " jobs remaining"
+	} else {
+		str = "No pending jobs!"
+	}
+
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Add("Access-Control-Allow-Methods", "PUT")
+	w.Header().Add("Access-Control-Allow-Headers", "Content-Type")
+	io.WriteString(w, str)
+}
+
 func handleExtractSub(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	subreddit := vars["subreddit"]
-	selection.SaveSubredditDataToFile(subreddit, "2016", BaseDataDirectory)
+
+	if len(extractSubQueue) > 0 {
+		extractSubQueue = append(extractSubQueue, subreddit)
+		io.WriteString(w, subreddit+" appended to queue!\nCurrent length: "+
+			strconv.Itoa(len(extractSubQueue))+"(Including the job currently processing)")
+	} else {
+		extractSubQueue = append(extractSubQueue, subreddit)
+		io.WriteString(w, subreddit+" appended to queue!\nCurrent length: "+
+			strconv.Itoa(len(extractSubQueue))+"(Including the job currently processing)")
+		tempSub := ""
+		for len(extractSubQueue) > 0 {
+			tempSub = extractSubQueue[0]
+			selection.SaveCriteriaDataToFile("subreddit", tempSub, "2016", BaseDataDirectory, selection.BasicSchema)
+			extractSubQueue = extractSubQueue[1:] //done
+			fmt.Println("COMPLETED")
+		}
+	}
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Add("Access-Control-Allow-Methods", "PUT")
 	w.Header().Add("Access-Control-Allow-Headers", "Content-Type")
