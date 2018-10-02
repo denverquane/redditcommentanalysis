@@ -9,21 +9,25 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+	"github.com/joho/godotenv"
+	"os"
 )
-
-const BaseDataDirectory = "D:/Reddit_Data"
-
-const RunServer = false
-const ServerPort = "5000"
 
 var authorStatusMap = make(map[string]string, 0)
 var subredditStatusMap = make(map[string]string, 0)
 var extractSubQueue = make([]string, 0)
 
 func main() {
+	err := godotenv.Load()
 
-	if RunServer {
-		log.Fatal(run())
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
+
+	if os.Getenv("RUN_SERVER") == "true" {
+		port := os.Getenv("SERVER_PORT")
+		log.Fatal(run(port))
 	} else {
 		//searchCriteria := selection.MakeSimpleSearchParams("2016", []string{"Dec"}, 0,
 		//	[]string{}, []string{"\"subreddit\":\"" + "pics" + "\""})
@@ -33,11 +37,11 @@ func main() {
 	}
 }
 
-func run() error {
+func run(port string) error {
 	handler := makeMuxRouter()
 
 	s := &http.Server{
-		Addr:           ":" + ServerPort,
+		Addr:           ":" + port,
 		Handler:        handler,
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   10 * time.Second,
@@ -104,7 +108,8 @@ func handleExtractSub(w http.ResponseWriter, r *http.Request) {
 		tempSub := ""
 		for len(extractSubQueue) > 0 {
 			tempSub = extractSubQueue[0]
-			selection.SaveCriteriaDataToFile("subreddit", tempSub, "2016", BaseDataDirectory, selection.BasicSchema)
+			selection.SaveCriteriaDataToFile("subreddit", tempSub, "2016",
+				os.Getenv("BASE_DATA_DIRECTORY"), selection.BasicSchema)
 			extractSubQueue = extractSubQueue[1:] //done
 			fmt.Println("COMPLETED")
 		}
@@ -173,12 +178,12 @@ func handleRunSubreddit(w http.ResponseWriter, r *http.Request) {
 
 func waitForChannelStats(sub string) {
 	subredditStatusMap[sub] = "Running"
-	str := selection.SubredditStats(sub, BaseDataDirectory)
+	str := selection.SubredditStats(sub, os.Getenv("BASE_DATA_DIRECTORY"))
 	subredditStatusMap[sub] = str
 }
 
 func waitForFilter(author string) {
 	authorStatusMap[author] = "Running"
-	str := selection.AuthorSubredditStats(author, BaseDataDirectory)
+	str := selection.AuthorSubredditStats(author, os.Getenv("BASE_DATA_DIRECTORY"))
 	authorStatusMap[author] = str
 }
