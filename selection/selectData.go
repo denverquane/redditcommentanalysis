@@ -288,6 +288,9 @@ func tallyWordOccurrences(comments []map[string]string) PairList {
 	tallies := make(map[string]uint64, 0)
 	filter, _ := regexp.Compile("[^a-zA-Z0-9]+")
 
+	//TODO add comments to a queue, and allow workers to process them
+	// (have to lock/unlock hashmap when incrementing the word's score)
+
 	for _, comment := range comments {
 		words := strings.Fields(comment["body"])
 		wordPresence := make(map[string]bool, len(words))
@@ -297,6 +300,7 @@ func tallyWordOccurrences(comments []map[string]string) PairList {
 			if IsStopWord(word) || word == "" {
 				continue
 			}
+			// wordPresence ensures we don't count repeat occurrences of a word within a single comment
 			if _, ok := wordPresence[word]; !ok {
 				wordPresence[word] = true
 				if _, ok := tallies[word]; ok {

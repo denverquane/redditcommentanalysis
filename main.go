@@ -29,11 +29,14 @@ func main() {
 		port := os.Getenv("SERVER_PORT")
 		log.Fatal(run(port))
 	} else {
+		year := "2016"
+		subreddit := "funny"
+		schema := "Basic"
 		//searchCriteria := selection.MakeSimpleSearchParams("2016", []string{"Dec"}, 0,
 		//	[]string{}, []string{"\"subreddit\":\"" + "pics" + "\""})
 		//_ = selection.FilterAllMonthsComments(searchCriteria, BaseDataDirectory, "")
 		//fmt.Println(allMonths)
-		selection.OpenExtractedDatafile("//diskstation/downloads/2016", "funny", "Basic")
+		selection.OpenExtractedDatafile(os.Getenv("BASE_DATA_DIRECTORY") + "/" + year, subreddit, schema)
 	}
 }
 
