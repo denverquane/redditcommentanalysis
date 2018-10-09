@@ -29,7 +29,8 @@ var commentFields = map[string]string{
 
 var BasicSchema = commentSchema{
 	name:   "Basic",
-	schema: commentFields}
+	schema: commentFields,
+}
 
 type commentSchema struct {
 	name   string
@@ -75,6 +76,7 @@ func OpenCachedOrProcessAndFilterMonth(searchCriteria *SearchParams, month strin
 	return commentData
 }
 
+// TODO why does this exist? Gets called from OpenCached... and also then calls THIS function...
 func FilterAllMonthsComments(searchCriteria *SearchParams, baseDir, suffix string) []map[string]string {
 	allMonthsComments := make([]map[string]string, 0)
 

@@ -195,7 +195,7 @@ func SaveCriteriaDataToFile(criteria string, value string, year string, basedir 
 			}
 			linesRead++
 
-			if strings.Contains(string(line), "\""+criteria+"\":\""+value+"\"") {
+			if strings.Contains(strings.ToLower(string(line)), "\""+criteria+"\":\""+value+"\"") {
 				parsed := getCommentDataFromLine(line, schema.schema)
 				relevantComments = append(relevantComments, parsed)
 			}
