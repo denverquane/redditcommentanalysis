@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -159,7 +160,7 @@ func SaveCriteriaDataToFile(criteria string, value string, year string, basedir 
 		}
 		var buffer bytes.Buffer
 		buffer.Write([]byte(basedir))
-		buffer.Write([]byte("/RC_" + year + monthToIntString(v)))
+		buffer.Write([]byte("/" + year + "/RC_" + year + monthToIntString(v)))
 		file, fileOpenErr := os.Open(buffer.String())
 		metafile, fileOpenErr2 := os.Open(buffer.String() + "_meta.txt")
 
@@ -235,62 +236,93 @@ func OpenExtractedDatafile(basedir string, subreddit string, extractedType strin
 	}
 	fmt.Println(strconv.Itoa(len(commentData)) + " total comments")
 
-	fmt.Println("Tallying word counts...")
-	tallies := tallyWordOccurrences(commentData)
+	fmt.Println("Tallying word and karma counts...")
+	tallies, karmas := tallyWordOccurrences(commentData)
 	for _, v := range tallies[:10] {
 		percent := (float64(v.Value) / float64(len(commentData))) * 100.0
-		fmt.Println(v.Key + ": " + strconv.FormatUint(v.Value, 10) + " comment occurrences (" +
+		fmt.Println(v.Key + ": " + strconv.FormatInt(v.Value, 10) + " comment occurrences (" +
 			strconv.FormatFloat(percent, 'f', 3, 64) + "%)")
 	}
-
-	keys := make([]string, 20)
-	i := 0
-	for _, v := range tallies[:20] {
-		keys[i] = v.Key
-		i++
-	}
-	fmt.Println("Tallying karma counts...")
-	karmas := tallyWordKarma(keys, commentData)
+	fmt.Println("getting karmas")
 	for _, karma := range karmas[:10] {
-		for _, pair := range tallies {
-			if pair.Key == karma.Key {
-				karmaPerOccurence := float64(karma.Value) / float64(pair.Value)
-				fmt.Println(karma.Key + ": " + strconv.FormatFloat(karmaPerOccurence, 'f', 5, 64) + " karma per comment")
-				continue
+		tally := int64(0)
+		for _, v := range tallies {
+			if v.Key == karma.Key {
+				tally = int64(v.Value)
+				break
 			}
 		}
+		karmaPerOccurrence := float64(karma.Value) / float64(tally)
+		fmt.Println(karma.Key + ": " + strconv.FormatInt(karma.Value, 10) + " total karma, " +
+			strconv.FormatFloat(karmaPerOccurrence, 'f', 5, 64) + " karma per containing comment (" +
+			strconv.FormatInt(tally, 10) + " occurrences)")
 	}
 }
 
-func rankByWordCount(wordFrequencies map[string]uint64) PairList {
-	pl := make(PairList, len(wordFrequencies))
+func sortByKarmaOrTally(karmaCounts map[string]IntPair, isTally bool) PairList {
+	pl := make(PairList, len(karmaCounts))
 	i := 0
-	for k, v := range wordFrequencies {
-		pl[i] = Pair{k, v}
+	for k, v := range karmaCounts {
+		if isTally {
+			pl[i] = ValPair{k, v.tally}
+		} else {
+			pl[i] = ValPair{k, v.karma}
+		}
 		i++
 	}
 	sort.Sort(sort.Reverse(pl))
 	return pl
 }
 
-type Pair struct {
+type ValPair struct {
 	Key   string
-	Value uint64
+	Value int64
 }
 
-type PairList []Pair
+type IntPair struct {
+	tally int64
+	karma int64
+}
+
+type PairList []ValPair
 
 func (p PairList) Len() int           { return len(p) }
 func (p PairList) Less(i, j int) bool { return p[i].Value < p[j].Value }
 func (p PairList) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
-func tallyWordOccurrences(comments []map[string]string) PairList {
-	tallies := make(map[string]uint64, 0)
+const MaxGoRoutines = 8
+
+func tallyWordOccurrences(comments []map[string]string) (PairList, PairList) {
+	tallies := make(map[string]IntPair)
+	var mux sync.Mutex
+
+	fmt.Println("Using " + strconv.Itoa(MaxGoRoutines) + " workers")
+
+	perWorker := len(comments) / MaxGoRoutines
+
+	c := make(chan bool, MaxGoRoutines)
+
+	start := time.Now()
+	for i := 0; i < MaxGoRoutines-1; i++ {
+		fmt.Println("from " + strconv.Itoa(i*perWorker) + " to " + strconv.Itoa((i+1)*perWorker))
+		go tallyComments(comments[i*perWorker:(i+1)*perWorker], &mux, &tallies, c)
+	}
+	fmt.Println("from " + strconv.Itoa((MaxGoRoutines-1)*perWorker) + " to " + strconv.Itoa(len(comments)))
+	go tallyComments(comments[(MaxGoRoutines-1)*perWorker:], &mux, &tallies, c)
+
+	for i := 0; i < MaxGoRoutines; i++ {
+		<-c
+	}
+
+	total := time.Now().Sub(start)
+	fmt.Println("Total time: " + total.String())
+
+	return sortByKarmaOrTally(tallies, true), sortByKarmaOrTally(tallies, false)
+}
+
+func tallyComments(comments []map[string]string, lock *sync.Mutex, tallies *map[string]IntPair, c chan bool) {
+	fmt.Println("Started worker!")
 	filter, _ := regexp.Compile("[^a-zA-Z0-9]+")
-
-	//TODO add comments to a queue, and allow workers to process them
-	// (have to lock/unlock hashmap when incrementing the word's score)
-
 	for _, comment := range comments {
 		words := strings.Fields(comment["body"])
 		wordPresence := make(map[string]bool, len(words))
@@ -303,42 +335,24 @@ func tallyWordOccurrences(comments []map[string]string) PairList {
 			// wordPresence ensures we don't count repeat occurrences of a word within a single comment
 			if _, ok := wordPresence[word]; !ok {
 				wordPresence[word] = true
-				if _, ok := tallies[word]; ok {
-					tallies[word]++
+				karma, err := strconv.ParseInt(comment["score"], 10, 64)
+				if err != nil {
+					log.Fatal(err)
+				}
+				lock.Lock()
+				if _, ok := (*tallies)[word]; ok {
+					pair := (*tallies)[word]
+					pair.karma += int64(karma)
+					pair.tally++
+					(*tallies)[word] = pair
 				} else {
-					tallies[word] = 1
+					(*tallies)[word] = IntPair{tally: 1, karma: int64(karma)}
 				}
+				lock.Unlock()
 			}
 		}
 	}
-	return rankByWordCount(tallies)
-}
-
-func tallyWordKarma(words []string, comments []map[string]string) PairList {
-	wordKarmas := make(map[string]uint64)
-	filter, _ := regexp.Compile("[^a-zA-Z0-9]+")
-	for _, comment := range comments {
-		subwords := strings.Fields(comment["body"])
-		for _, word := range words {
-			for _, subword := range subwords {
-				subword = strings.ToLower(subword)
-				subword = filter.ReplaceAllString(subword, "")
-				if word == subword {
-					karma, err := strconv.ParseInt(comment["score"], 10, 64)
-					if err != nil {
-						log.Fatal(err)
-					}
-					if _, ok := wordKarmas[word]; ok {
-						wordKarmas[word] += uint64(karma)
-					} else {
-						wordKarmas[word] = uint64(karma)
-					}
-					break
-				}
-			}
-		}
-	}
-	return rankByWordCount(wordKarmas)
+	c <- true
 }
 
 func dumpDataToFilepath(data []map[string]string, filePath string) {
