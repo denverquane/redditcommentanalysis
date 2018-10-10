@@ -29,7 +29,8 @@ var commentFields = map[string]string{
 
 var BasicSchema = commentSchema{
 	name:   "Basic",
-	schema: commentFields}
+	schema: commentFields,
+}
 
 type commentSchema struct {
 	name   string
@@ -39,7 +40,7 @@ type commentSchema struct {
 func OpenCachedOrProcessAndFilterMonth(searchCriteria *SearchParams, month string, BaseDir string, suffix string) []map[string]string {
 	var commentData []map[string]string
 	searchCriteria.months = []string{month} //make sure the saved file only refers to this month specifically
-	res := searchCriteria.ValuesToString()
+	res := searchCriteria.ValuesToString()  //convert the criteria to some string so we can recognize it in the filename later
 	dir := BaseDir + "/" + month + "/" + res + suffix
 	fmt.Println(dir)
 
@@ -75,6 +76,7 @@ func OpenCachedOrProcessAndFilterMonth(searchCriteria *SearchParams, month strin
 	return commentData
 }
 
+// TODO why does this exist? Gets called from OpenCached... and also then calls THIS function...
 func FilterAllMonthsComments(searchCriteria *SearchParams, baseDir, suffix string) []map[string]string {
 	allMonthsComments := make([]map[string]string, 0)
 
