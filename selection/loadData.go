@@ -10,6 +10,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"strings"
 )
 
 type SubredditSplitScores struct {
@@ -74,6 +75,19 @@ func OpenCachedOrProcessAndFilterMonth(searchCriteria *SearchParams, month strin
 		}
 	}
 	return commentData
+}
+
+func ScanDirForExtractedSubData(directory string, schema string) []string {
+	subs := make([]string, 0)
+	dirList, _ := ioutil.ReadDir(directory)
+	for _, v := range dirList {
+		if strings.Contains(v.Name(), "subreddit_") && strings.Contains(v.Name(), "_"+schema) {
+			str := strings.Replace(v.Name(), "subreddit_", "", -1)
+			str = strings.Replace(str, "_"+schema, "", -1)
+			subs = append(subs, str)
+		}
+	}
+	return subs
 }
 
 // TODO why does this exist? Gets called from OpenCached... and also then calls THIS function...

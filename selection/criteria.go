@@ -7,6 +7,8 @@ import (
 
 var AllMonths = []string{"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"}
 
+var AllYears = []string{"2010", "2011", "2012", "2014", "2015", "2016"}
+
 type intVsInt func(int, int) bool
 
 func IsGreater(x int, y int) bool {

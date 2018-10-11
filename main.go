@@ -45,18 +45,23 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
+	checkForExtractedSubs("2016", "Basic")
+
 	if os.Getenv("RUN_SERVER") == "true" {
 		port := os.Getenv("SERVER_PORT")
 		log.Fatal(run(port))
 	} else {
-		year := "2016"
-		subreddit := "funny"
-		schema := "Basic"
-		//searchCriteria := selection.MakeSimpleSearchParams("2016", []string{"Dec"}, 0,
-		//	[]string{}, []string{"\"subreddit\":\"" + "pics" + "\""})
-		//_ = selection.FilterAllMonthsComments(searchCriteria, BaseDataDirectory, "")
-		//fmt.Println(allMonths)
-		selection.OpenExtractedDatafile(os.Getenv("BASE_DATA_DIRECTORY")+"/"+year, subreddit, schema)
+		//year := "2016"
+		//subreddit := "funny"
+		//schema := "Basic"
+		////searchCriteria := selection.MakeSimpleSearchParams("2016", []string{"Dec"}, 0,
+		////	[]string{}, []string{"\"subreddit\":\"" + "pics" + "\""})
+		////_ = selection.FilterAllMonthsComments(searchCriteria, BaseDataDirectory, "")
+		////fmt.Println(allMonths)
+		//selection.OpenExtractedDatafile(os.Getenv("BASE_DATA_DIRECTORY")+"/"+year, subreddit, schema)
+		//str, _ := ioutil.ReadDir(os.Getenv("BASE_DATA_DIRECTORY") + "/2016/Jan")
+		//scanDirForExtractedSubData(os.Getenv("BASE_DATA_DIRECTORY") + "/2016/Jan", "Basic")
+
 	}
 }
 
@@ -75,6 +80,33 @@ func run(port string) error {
 		return err
 	}
 	return nil
+}
+
+func checkForExtractedSubs(year string, schema string) {
+	dir := os.Getenv("BASE_DATA_DIRECTORY") + "/" + year + "/"
+	arr := selection.ScanDirForExtractedSubData(dir+"Jan", schema)
+	for _, sub := range arr {
+		//TODO actually insert status (total comments?) for a given subreddit
+		subredditStatuses[sub] = subredditStatus{extracting: false, extractedSummary: "gh", processing: false, processedSummary: ""}
+	}
+
+	for _, v := range selection.AllMonths {
+		arr := selection.ScanDirForExtractedSubData(dir+v, schema)
+		for prevSubName := range subredditStatuses {
+			found := false
+			for _, newSubName := range arr {
+				if newSubName == prevSubName {
+					found = true
+					break
+				}
+			}
+			if !found {
+				fmt.Println("Missing successive months for " + prevSubName)
+			} else {
+				fmt.Println("All months successfully validated for " + prevSubName)
+			}
+		}
+	}
 }
 
 func makeMuxRouter() http.Handler {
