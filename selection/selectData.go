@@ -150,13 +150,17 @@ func recurseBuildCompleteLine(reader *bufio.Reader) []byte {
 	}
 }
 
-func SaveCriteriaDataToFile(criteria string, value string, year string, basedir string, schema commentSchema) {
+func SaveCriteriaDataToFile(criteria string, value string, year string, basedir string, schema commentSchema) string {
+	summary := ""
 	for _, v := range AllMonths {
 		relevantComments := make([]map[string]string, 0)
-		str := basedir + "/" + v + "/" + criteria + "_" + value + "_" + schema.name
+		str := basedir + "/" + year + "/" + v + "/" + criteria + "_" + value + "_" + schema.name
 		if _, err := os.Stat(str); !os.IsNotExist(err) {
 			fmt.Println("Found cached data for " + str)
+			summary += "Found cached data for " + str + "\n"
 			continue
+		} else {
+			fmt.Println("No cached data found for " + str)
 		}
 		var buffer bytes.Buffer
 		buffer.Write([]byte(basedir))
@@ -212,9 +216,12 @@ func SaveCriteriaDataToFile(criteria string, value string, year string, basedir 
 			}
 		}
 		dif := time.Now().Sub(startTime).String()
-		fmt.Println("Took " + dif + " to search " + strconv.FormatUint(linesRead, 10) + " comments of file " + buffer.String())
+		tempStr := "Took " + dif + " to search " + strconv.FormatUint(linesRead, 10) + " comments of file " + buffer.String() + "\n"
+		summary += tempStr
+		fmt.Println(tempStr)
 		dumpDataToFilepath(relevantComments, str)
 	}
+	return summary
 }
 
 func OpenExtractedDatafile(basedir string, subreddit string, extractedType string) {
@@ -223,7 +230,7 @@ func OpenExtractedDatafile(basedir string, subreddit string, extractedType strin
 	for _, v := range AllMonths {
 		fmt.Println("Reading " + v)
 		var tempCommData []map[string]string
-		str := basedir + "/" + v + "/" + subreddit + "_" + extractedType
+		str := basedir + "/" + v + "/" + "subreddit_" + subreddit + "_" + extractedType
 		plan, fileOpenErr := ioutil.ReadFile(str)
 		if fileOpenErr != nil {
 			log.Fatal("failed to open " + str)
