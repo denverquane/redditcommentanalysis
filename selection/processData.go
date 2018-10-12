@@ -1,0 +1,208 @@
+package selection
+
+import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"log"
+	"os"
+	"regexp"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+)
+
+type SubredditSplitScores struct {
+	A_Scores     []int64
+	B_Scores     []int64
+	Total_Scores []int64 //what all the comments look like for a user
+}
+
+//NOTE changing this datamodel can invalidate older or future data captures...
+
+const HundredThousand = 100000
+const OneMillion = 1000000
+const TenMillion = 10000000
+
+func OpenExtractedSubredditDatafile(basedir string, subreddit string, extractedType string) {
+	var commentData []map[string]string
+
+	for _, v := range AllMonths {
+		fmt.Println("Reading " + v)
+		var tempCommData []map[string]string
+		str := basedir + "/" + v + "/" + "subreddit_" + subreddit + "_" + extractedType
+		plan, fileOpenErr := ioutil.ReadFile(str)
+		if fileOpenErr != nil {
+			log.Fatal("failed to open " + str)
+		}
+		err := json.Unmarshal(plan, &tempCommData)
+		if err != nil {
+			log.Println(err)
+		}
+		commentData = append(commentData, tempCommData...)
+	}
+	fmt.Println(strconv.Itoa(len(commentData)) + " total comments")
+
+	fmt.Println("Tallying word and karma counts...")
+	tallies, karmas := tallyWordOccurrences(commentData)
+	for _, v := range tallies[:10] {
+		percent := (float64(v.Value) / float64(len(commentData))) * 100.0
+		fmt.Println(v.Key + ": " + strconv.FormatInt(v.Value, 10) + " comment occurrences (" +
+			strconv.FormatFloat(percent, 'f', 3, 64) + "%)")
+	}
+	fmt.Println("getting karmas")
+	for _, karma := range karmas[:10] {
+		tally := int64(0)
+		for _, v := range tallies {
+			if v.Key == karma.Key {
+				tally = int64(v.Value)
+				break
+			}
+		}
+		karmaPerOccurrence := float64(karma.Value) / float64(tally)
+		fmt.Println(karma.Key + ": " + strconv.FormatInt(karma.Value, 10) + " total karma, " +
+			strconv.FormatFloat(karmaPerOccurrence, 'f', 5, 64) + " karma per containing comment (" +
+			strconv.FormatInt(tally, 10) + " occurrences)")
+	}
+}
+
+func sortByKarmaOrTally(karmaCounts map[string]IntPair, isTally bool) PairList {
+	pl := make(PairList, len(karmaCounts))
+	i := 0
+	for k, v := range karmaCounts {
+		if isTally {
+			pl[i] = ValPair{k, v.tally}
+		} else {
+			pl[i] = ValPair{k, v.karma}
+		}
+		i++
+	}
+	sort.Sort(sort.Reverse(pl))
+	return pl
+}
+
+type ValPair struct {
+	Key   string
+	Value int64
+}
+
+type IntPair struct {
+	tally int64
+	karma int64
+}
+
+type PairList []ValPair
+
+func (p PairList) Len() int           { return len(p) }
+func (p PairList) Less(i, j int) bool { return p[i].Value < p[j].Value }
+func (p PairList) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+
+const MaxGoRoutines = 8
+
+func tallyWordOccurrences(comments []map[string]string) (PairList, PairList) {
+	tallies := make(map[string]IntPair)
+	var mux sync.Mutex
+
+	fmt.Println("Using " + strconv.Itoa(MaxGoRoutines) + " workers")
+
+	perWorker := len(comments) / MaxGoRoutines
+
+	c := make(chan bool, MaxGoRoutines)
+
+	start := time.Now()
+	for i := 0; i < MaxGoRoutines-1; i++ {
+		fmt.Println("from " + strconv.Itoa(i*perWorker) + " to " + strconv.Itoa((i+1)*perWorker))
+		go tallyCommentsWorker(comments[i*perWorker:(i+1)*perWorker], &mux, &tallies, c)
+	}
+	fmt.Println("from " + strconv.Itoa((MaxGoRoutines-1)*perWorker) + " to " + strconv.Itoa(len(comments)))
+	go tallyCommentsWorker(comments[(MaxGoRoutines-1)*perWorker:], &mux, &tallies, c)
+
+	for i := 0; i < MaxGoRoutines; i++ {
+		<-c
+	}
+
+	total := time.Now().Sub(start)
+	fmt.Println("Total time: " + total.String())
+
+	return sortByKarmaOrTally(tallies, true), sortByKarmaOrTally(tallies, false)
+}
+
+func tallyCommentsWorker(comments []map[string]string, lock *sync.Mutex, tallies *map[string]IntPair, c chan bool) {
+	fmt.Println("Started worker!")
+	filter, _ := regexp.Compile("[^a-zA-Z0-9]+")
+	for _, comment := range comments {
+		words := strings.Fields(comment["body"])
+		wordPresence := make(map[string]bool, len(words))
+		for _, word := range words {
+			word = strings.ToLower(word)
+			word = filter.ReplaceAllString(word, "")
+			if IsStopWord(word) || word == "" {
+				continue
+			}
+			// wordPresence ensures we don't count repeat occurrences of a word within a single comment
+			if _, ok := wordPresence[word]; !ok {
+				wordPresence[word] = true
+				karma, err := strconv.ParseInt(comment["score"], 10, 64)
+				if err != nil {
+					log.Fatal(err)
+				}
+				lock.Lock()
+				if _, ok := (*tallies)[word]; ok {
+					pair := (*tallies)[word]
+					pair.karma += int64(karma)
+					pair.tally++
+					(*tallies)[word] = pair
+				} else {
+					(*tallies)[word] = IntPair{tally: 1, karma: int64(karma)}
+				}
+				lock.Unlock()
+			}
+		}
+	}
+	c <- true
+}
+
+func dumpDataToFilepath(data []map[string]string, filePath string) {
+	f, err := os.Create(filePath)
+	if err != nil {
+		log.Println(err)
+	}
+
+	bytess, err2 := json.Marshal(data)
+	if err2 != nil {
+		log.Println(err2)
+	}
+	f.Write(bytess)
+	f.Close()
+}
+
+func ScanDirForExtractedSubData(directory string, schema string) []string {
+	subs := make([]string, 0)
+	dirList, _ := ioutil.ReadDir(directory)
+	for _, v := range dirList {
+		if strings.Contains(v.Name(), "subreddit_") && strings.Contains(v.Name(), "_"+schema) {
+			str := strings.Replace(v.Name(), "subreddit_", "", -1)
+			str = strings.Replace(str, "_"+schema, "", -1)
+			subs = append(subs, str)
+		}
+	}
+	return subs
+}
+
+func average(ints []int64) float64 {
+	var sum int64 = 0
+	for _, v := range ints {
+		sum += v
+	}
+	return float64(sum) / float64(len(ints))
+}
+
+func faverage(floats []float64) float64 {
+	var sum float64 = 0
+	for _, v := range floats {
+		sum += v
+	}
+	return sum / float64(len(floats))
+}
