@@ -4,6 +4,7 @@ var AllMonths = []string{"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug",
 
 var AllYears = []string{"2010", "2011", "2012", "2014", "2015", "2016"}
 
+//NOTE changing this datamodel can invalidate older or future data captures...
 var commentFields = map[string]string{
 	"author":    "str",
 	"subreddit": "str",

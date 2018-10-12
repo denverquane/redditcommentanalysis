@@ -14,14 +14,6 @@ import (
 	"time"
 )
 
-type SubredditSplitScores struct {
-	A_Scores     []int64
-	B_Scores     []int64
-	Total_Scores []int64 //what all the comments look like for a user
-}
-
-//NOTE changing this datamodel can invalidate older or future data captures...
-
 const HundredThousand = 100000
 const OneMillion = 1000000
 const TenMillion = 10000000
@@ -48,44 +40,44 @@ func OpenExtractedSubredditDatafile(basedir string, subreddit string, extractedT
 	fmt.Println("Tallying word and karma counts...")
 	tallies, karmas := tallyWordOccurrences(commentData)
 	for _, v := range tallies[:10] {
-		percent := (float64(v.Value) / float64(len(commentData))) * 100.0
-		fmt.Println(v.Key + ": " + strconv.FormatInt(v.Value, 10) + " comment occurrences (" +
+		percent := (float64(v.TotalCount) / float64(len(commentData))) * 100.0
+		fmt.Println(v.Word + ": " + strconv.FormatInt(v.TotalCount, 10) + " comment occurrences (" +
 			strconv.FormatFloat(percent, 'f', 3, 64) + "%)")
 	}
 	fmt.Println("getting karmas")
 	for _, karma := range karmas[:10] {
-		tally := int64(0)
-		for _, v := range tallies {
-			if v.Key == karma.Key {
-				tally = int64(v.Value)
-				break
-			}
-		}
-		karmaPerOccurrence := float64(karma.Value) / float64(tally)
-		fmt.Println(karma.Key + ": " + strconv.FormatInt(karma.Value, 10) + " total karma, " +
-			strconv.FormatFloat(karmaPerOccurrence, 'f', 5, 64) + " karma per containing comment (" +
-			strconv.FormatInt(tally, 10) + " occurrences)")
+		fmt.Println(karma.Word + ": " + strconv.FormatInt(karma.TotalKarma, 10) + " karma total")
 	}
 }
 
-func sortByKarmaOrTally(karmaCounts map[string]IntPair, isTally bool) PairList {
-	pl := make(PairList, len(karmaCounts))
+func sortKarma(karmaCounts map[string]IntPair) KarmaList {
+	pl := make(KarmaList, len(karmaCounts))
 	i := 0
 	for k, v := range karmaCounts {
-		if isTally {
-			pl[i] = ValPair{k, v.tally}
-		} else {
-			pl[i] = ValPair{k, v.karma}
-		}
+		//karmaPerOccurrence := float64(v.karma) / float64(v.tally)
+		pl[i] = KeywordStats{k, v.karma, v.tally, []string{""}}
 		i++
 	}
 	sort.Sort(sort.Reverse(pl))
 	return pl
 }
 
-type ValPair struct {
-	Key   string
-	Value int64
+func sortTallies(tallies map[string]IntPair) TallyList {
+	pl := make(TallyList, len(tallies))
+	i := 0
+	for k, v := range tallies {
+		pl[i] = KeywordStats{k, v.karma, v.tally, []string{""}}
+		i++
+	}
+	sort.Sort(sort.Reverse(pl))
+	return pl
+}
+
+type KeywordStats struct {
+	Word       string
+	TotalKarma int64
+	TotalCount int64
+	CommentIDs []string //TODO Might be helpful for retrieving a specific comment that needs manual viewing
 }
 
 type IntPair struct {
@@ -93,15 +85,21 @@ type IntPair struct {
 	karma int64
 }
 
-type PairList []ValPair
+type KarmaList []KeywordStats
 
-func (p PairList) Len() int           { return len(p) }
-func (p PairList) Less(i, j int) bool { return p[i].Value < p[j].Value }
-func (p PairList) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+func (p KarmaList) Len() int           { return len(p) }
+func (p KarmaList) Less(i, j int) bool { return p[i].TotalKarma < p[j].TotalKarma }
+func (p KarmaList) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+
+type TallyList []KeywordStats
+
+func (p TallyList) Len() int           { return len(p) }
+func (p TallyList) Less(i, j int) bool { return p[i].TotalCount < p[j].TotalCount }
+func (p TallyList) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
 const MaxGoRoutines = 8
 
-func tallyWordOccurrences(comments []map[string]string) (PairList, PairList) {
+func tallyWordOccurrences(comments []map[string]string) (TallyList, KarmaList) {
 	tallies := make(map[string]IntPair)
 	var mux sync.Mutex
 
@@ -126,7 +124,7 @@ func tallyWordOccurrences(comments []map[string]string) (PairList, PairList) {
 	total := time.Now().Sub(start)
 	fmt.Println("Total time: " + total.String())
 
-	return sortByKarmaOrTally(tallies, true), sortByKarmaOrTally(tallies, false)
+	return sortTallies(tallies), sortKarma(tallies)
 }
 
 func tallyCommentsWorker(comments []map[string]string, lock *sync.Mutex, tallies *map[string]IntPair, c chan bool) {

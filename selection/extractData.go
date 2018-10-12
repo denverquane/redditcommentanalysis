@@ -46,6 +46,8 @@ const percentPerMonth = (1.0 / 12.0) * 100.0
 
 func SaveCriteriaDataToFile(criteria string, value string, year string, basedir string, schema commentSchema, progress *float64) string {
 	summary := ""
+	criteria = strings.ToLower(criteria)
+	value = strings.ToLower(value)
 	for mIndex, v := range AllMonths {
 		relevantComments := make([]map[string]string, 0)
 		str := basedir + "/" + year + "/" + v + "/" + criteria + "_" + value + "_" + schema.name
@@ -56,18 +58,19 @@ func SaveCriteriaDataToFile(criteria string, value string, year string, basedir 
 		} else {
 			fmt.Println("No cached data found for " + str)
 		}
-		var buffer bytes.Buffer
-		buffer.Write([]byte(basedir))
-		buffer.Write([]byte("/" + year + "/RC_" + year + monthToIntString(v)))
-		file, fileOpenErr := os.Open(buffer.String())
-		metafile, fileOpenErr2 := os.Open(buffer.String() + "_meta.txt")
 
+		var buffer bytes.Buffer
+		buffer.Write([]byte(basedir + "/" + year + "/RC_" + year + monthToIntString(v)))
+		file, fileOpenErr := os.Open(buffer.String())
 		if fileOpenErr != nil {
 			fmt.Print(fileOpenErr)
 			os.Exit(0)
+		} else {
+			fmt.Println("Opened file " + buffer.String())
 		}
-		var totalLines uint64
 
+		var totalLines uint64
+		metafile, fileOpenErr2 := os.Open(buffer.String() + "_meta.txt")
 		if fileOpenErr2 != nil {
 			totalLines = 0
 			metafile.Close()
@@ -79,14 +82,10 @@ func SaveCriteriaDataToFile(criteria string, value string, year string, basedir 
 
 		reader := bufio.NewReaderSize(file, 4096)
 
-		fmt.Println("Opened file " + buffer.String())
-
 		var linesRead uint64 = 0
-
 		startTime := time.Now()
 		tempTime := startTime
 		for {
-
 			line := recurseBuildCompleteLine(reader)
 			if line == nil {
 				fmt.Println("Lines: " + strconv.FormatUint(linesRead, 10))
@@ -114,14 +113,14 @@ func SaveCriteriaDataToFile(criteria string, value string, year string, basedir 
 		}
 		dif := time.Now().Sub(startTime).String()
 		tempStr := "Took " + dif + " to search " + strconv.FormatUint(linesRead, 10) + " comments of file " + buffer.String() + "\n"
-		summary += tempStr
-		fmt.Println(tempStr)
-		dumpDataToFilepath(relevantComments, str)
-		*progress = percentPerMonth * float64(mIndex+1.0)
 		if len(relevantComments) == 0 {
 			log.Println("Found 0 comments for " + criteria + ":" + value + " in " + v + ", exiting extraction!")
 			return "ERROR"
 		}
+		summary += tempStr
+		fmt.Println(tempStr)
+		dumpDataToFilepath(relevantComments, str)
+		*progress = percentPerMonth * float64(mIndex+1.0)
 	}
 	return summary
 }
