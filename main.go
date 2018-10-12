@@ -135,11 +135,10 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 	if len(extractSubQueue) > 0 {
 		str += "These subreddits are in the queue and waiting to be extracted: \n"
 		for _, v := range extractSubQueue {
-			str += v + "\n"
-			if vv, ok := subredditStatuses[v]; ok {
-				if vv.extracting {
-					str += " (currently extracting, " + strconv.FormatFloat(extractingProg, 'f', 2, 64) + "% complete)\n"
-				}
+			if vv, ok := subredditStatuses[v]; ok && vv.extracting {
+				str += v + " (currently extracting, " + strconv.FormatFloat(extractingProg, 'f', 2, 64) + "% complete)\n"
+			} else {
+				str += v + "\n"
 			}
 		}
 	} else {
@@ -162,13 +161,18 @@ func handleExtractSub(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		extractSubQueue = append(extractSubQueue, subreddit)
-		io.WriteString(w, subreddit+" appended to queue!\nCurrent length: "+
-			strconv.Itoa(len(extractSubQueue))+"(Including the job currently processing)")
+		io.WriteString(w, subreddit+" appended to queue!\nNew job queue:\n")
+		str := ""
+		for _, v := range extractSubQueue {
+			str += v + "\n"
+		}
+
 		subredditStatuses[subreddit] = subredditStatus{}
 
 		if len(extractSubQueue) == 1 {
 			go extractQueue() //this is the main goroutine that will process all the future jobs
 		}
+		io.WriteString(w, str)
 	}
 
 	w.Header().Set("Access-Control-Allow-Origin", "*")

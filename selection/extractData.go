@@ -118,6 +118,10 @@ func SaveCriteriaDataToFile(criteria string, value string, year string, basedir 
 		fmt.Println(tempStr)
 		dumpDataToFilepath(relevantComments, str)
 		*progress = percentPerMonth * float64(mIndex+1.0)
+		if len(relevantComments) == 0 {
+			log.Println("Found 0 comments for " + criteria + ":" + value + " in " + v + ", exiting extraction!")
+			return "ERROR"
+		}
 	}
 	return summary
 }
