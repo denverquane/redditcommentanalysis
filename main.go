@@ -13,56 +13,6 @@ import (
 	"time"
 )
 
-var extractSubQueue = make([]string, 0)
-var subredditStatuses = make(map[string]subredditStatus)
-
-type subredditStatus struct {
-	extracting       bool
-	extractedSummary string
-	processing       bool
-	processedSummary string
-}
-
-func (status subredditStatus) ToString() string {
-	str := "Extracting: " + strconv.FormatBool(status.extracting) + "\n"
-
-	if !status.extracting && status.extractedSummary != "" {
-		str += "Extracted summary: " + status.extractedSummary + "\n"
-	}
-
-	str += "Processing: " + strconv.FormatBool(status.processing) + "\n"
-
-	if !status.processing && status.processedSummary != "" {
-		str += "Processed summary: " + status.processedSummary + "\n"
-	}
-
-	return str
-}
-
-func main() {
-	err := godotenv.Load()
-
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
-
-	checkForExtractedSubs("2016", "Basic")
-
-	if os.Getenv("RUN_SERVER") == "true" {
-		port := os.Getenv("SERVER_PORT")
-		log.Fatal(run(port))
-	} else {
-		year := "2016"
-		subreddit := "funny"
-		schema := "Basic"
-		//var prog float64
-		//_ = selection.SaveCriteriaDataToFile("subreddit", "funny", "2016", os.Getenv("BASE_DATA_DIRECTORY"), selection.BasicSchema, &prog)
-		selection.OpenExtractedSubredditDatafile(os.Getenv("BASE_DATA_DIRECTORY")+"/"+year, subreddit, schema)
-		//scanDirForExtractedSubData(os.Getenv("BASE_DATA_DIRECTORY") + "/2016/Jan", "Basic")
-
-	}
-}
-
 func run(port string) error {
 	handler := makeMuxRouter()
 
@@ -112,12 +62,63 @@ func checkForExtractedSubs(year string, schema string) {
 	}
 }
 
+var extractSubQueue = make([]string, 0)
+var processSubQueue = make([]string, 0)
+var subredditStatuses = make(map[string]subredditStatus)
+
+type subredditStatus struct {
+	extracting       bool
+	extractedSummary string
+	processing       bool
+	processedSummary string
+}
+
+func (status subredditStatus) ToString() string {
+	str := "Extracting: " + strconv.FormatBool(status.extracting) + "\n"
+
+	if !status.extracting && status.extractedSummary != "" {
+		str += "Extracted summary: " + status.extractedSummary + "\n"
+	}
+
+	str += "Processing: " + strconv.FormatBool(status.processing) + "\n"
+
+	if !status.processing && status.processedSummary != "" {
+		str += "Processed summary: " + status.processedSummary + "\n"
+	}
+
+	return str
+}
+
+func main() {
+	err := godotenv.Load()
+
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
+	checkForExtractedSubs("2016", "Basic")
+
+	if os.Getenv("RUN_SERVER") == "true" {
+		port := os.Getenv("SERVER_PORT")
+		log.Fatal(run(port))
+	} else {
+		year := "2016"
+		subreddit := "funny"
+		schema := "Basic"
+		//var prog float64
+		//_ = selection.SaveCriteriaDataToFile("subreddit", "funny", "2016", os.Getenv("BASE_DATA_DIRECTORY"), selection.BasicSchema, &prog)
+		selection.OpenExtractedSubredditDatafile(os.Getenv("BASE_DATA_DIRECTORY")+"/"+year, subreddit, schema, &processingProg)
+		//scanDirForExtractedSubData(os.Getenv("BASE_DATA_DIRECTORY") + "/2016/Jan", "Basic")
+
+	}
+}
+
 func makeMuxRouter() http.Handler {
 	muxRouter := mux.NewRouter()
 
 	muxRouter.HandleFunc("/", handleIndex).Methods("GET")
 	muxRouter.HandleFunc("/status", handleStatus).Methods("GET")
-	muxRouter.HandleFunc("/extractedSubs", handleGetExtractedSubs)
+	muxRouter.HandleFunc("/subs", handleGetSubs)
 	muxRouter.HandleFunc("/extractSub/{subreddit}", handleExtractSub).Methods("GET")
 	muxRouter.HandleFunc("/status/{subreddit}", handleViewStatus).Methods("GET")
 	muxRouter.HandleFunc("/processSub/{subreddit}", handleProcessSub).Methods("GET")
@@ -127,7 +128,7 @@ func makeMuxRouter() http.Handler {
 func handleIndex(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "Welcome to the Reddit Comment Extractor!\nThese are the endpoints to use:\n")
 	io.WriteString(w, "GET \"/status\" displays the overall status of this server and its data processing\n")
-	io.WriteString(w, "GET \"/extractedSubs\" lists all subreddits with all comments extracted\n")
+	io.WriteString(w, "GET \"/subs\" lists all subreddits with all comments extracted and/or processed\n")
 	io.WriteString(w, "GET \"/extractSub/<sub>\" extracts ALL comments from the <sub> subreddit, and saves to a datafile for later processing\n")
 	io.WriteString(w, "GET \"/processSub/<sub>\" processes the previously-extracted data for a subreddit, and saves these processed analytics for later retrieval\n")
 	io.WriteString(w, "GET \"/status/<sub>\" displays the extraction and processing status for a subreddit\n")
@@ -138,24 +139,46 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 	str := ""
 	if len(extractSubQueue) > 0 {
 		str += "These subreddits are in the queue and waiting to be extracted: \n"
-		for _, v := range extractSubQueue {
+		for i, v := range extractSubQueue {
 			if vv, ok := subredditStatuses[v]; ok && vv.extracting {
-				str += v + " (currently extracting, " + strconv.FormatFloat(extractingProg, 'f', 2, 64) + "% complete)\n"
+				str += strconv.Itoa(i+1) + ". " + v + " (currently extracting, " + strconv.FormatFloat(extractingProg, 'f', 2, 64) + "% complete)\n"
 			} else {
-				str += v + "\n"
+				str += strconv.Itoa(i+1) + ". " + v + "\n"
+			}
+		}
+	} else {
+		str += "Subreddit extraction queue is empty: waiting for jobs!"
+	}
+	str += "\n\n"
+	if len(processSubQueue) > 0 {
+		str += "These subreddits are in the queue and waiting to be processed: \n"
+		for i, v := range processSubQueue {
+			if vv, ok := subredditStatuses[v]; ok && vv.processing {
+				str += strconv.Itoa(i+1) + ". " + v + " (currently processing, " + strconv.FormatFloat(processingProg, 'f', 2, 64) + "% complete)\n"
+			} else {
+				str += strconv.Itoa(i+1) + ". " + v + "\n"
 			}
 		}
 	} else {
 		str += "Subreddit processing queue is empty: waiting for jobs!"
 	}
+
 	io.WriteString(w, str)
 	writeStdHeaders(w)
 }
 
-func handleGetExtractedSubs(w http.ResponseWriter, r *http.Request) {
+func handleGetSubs(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "Subreddits already extracted:\n")
-	for sub, _ := range subredditStatuses {
-		io.WriteString(w, sub+"\n")
+	for sub, v := range subredditStatuses {
+		if v.extractedSummary != "" {
+			io.WriteString(w, sub+"\n")
+		}
+	}
+	io.WriteString(w, "\nSubreddits already processed:\n")
+	for sub, v := range subredditStatuses {
+		if v.processedSummary != "" {
+			io.WriteString(w, sub+"\n")
+		}
 	}
 	writeStdHeaders(w)
 }
@@ -171,16 +194,16 @@ func handleExtractSub(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		extractSubQueue = append(extractSubQueue, subreddit)
-		io.WriteString(w, subreddit+" appended to queue!\nNew job queue:\n")
+		io.WriteString(w, subreddit+" appended to extraction queue!\nNew job queue:\n")
 		str := ""
-		for _, v := range extractSubQueue {
-			str += v + "\n"
+		for i, v := range extractSubQueue {
+			str += strconv.Itoa(i+1) + ". " + v + "\n"
 		}
 
 		subredditStatuses[subreddit] = subredditStatus{}
 
 		if len(extractSubQueue) == 1 {
-			go extractQueue() //this is the main goroutine that will process all the future jobs
+			go extractQueue() //this is the main goroutine that will extract all the future jobs
 		}
 		io.WriteString(w, str)
 	}
@@ -188,6 +211,7 @@ func handleExtractSub(w http.ResponseWriter, r *http.Request) {
 }
 
 var extractingProg float64
+var processingProg float64
 
 func extractQueue() {
 	tempSub := ""
@@ -223,7 +247,19 @@ func handleProcessSub(w http.ResponseWriter, r *http.Request) {
 		} else if val.extracting {
 			io.WriteString(w, "Subreddit \""+subreddit+"\" is still being extracted")
 		} else if val.extractedSummary != "" {
-			go selection.OpenExtractedSubredditDatafile(os.Getenv("BASE_DATA_DIRECTORY")+"/"+"2016", subreddit, "Basic")
+			processSubQueue = append(processSubQueue, subreddit)
+
+			io.WriteString(w, subreddit+" appended to processing queue!\nNew job queue:\n")
+			str := ""
+			for i, v := range processSubQueue {
+				str += strconv.Itoa(i+1) + ". " + v + "\n"
+			}
+			subredditStatuses[subreddit] = subredditStatus{}
+
+			if len(processSubQueue) == 1 {
+				go processQueue() //this is the main goroutine that will process all the future jobs
+			}
+			io.WriteString(w, str)
 		} else {
 			io.WriteString(w, "Subreddit has not been extracted or processed yet, please hit the endpoint \"/extractSub/"+subreddit+"\" to extract the subreddit data first")
 		}
@@ -231,6 +267,27 @@ func handleProcessSub(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, "Subreddit has not been extracted or processed yet, please hit the endpoint \"/extractSub/"+subreddit+"\" to extract the subreddit data first")
 	}
 	writeStdHeaders(w)
+}
+
+func processQueue() {
+	tempSub := ""
+	for len(processSubQueue) > 0 {
+		tempSub = processSubQueue[0]
+		if v, ok := subredditStatuses[tempSub]; !ok {
+			log.Fatal("Tried to process a sub not found in the registry!")
+		} else {
+			v.processing = true
+			subredditStatuses[tempSub] = v
+		}
+		str := selection.OpenExtractedSubredditDatafile(os.Getenv("BASE_DATA_DIRECTORY")+"/"+"2016", tempSub, "Basic", &processingProg)
+
+		v := subredditStatuses[tempSub]
+		v.processing = false
+		v.processedSummary = str
+		subredditStatuses[tempSub] = v
+		processSubQueue = processSubQueue[1:] //done
+		fmt.Println("COMPLETED")
+	}
 }
 
 func handleViewStatus(w http.ResponseWriter, r *http.Request) {

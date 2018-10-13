@@ -18,10 +18,11 @@ const HundredThousand = 100000
 const OneMillion = 1000000
 const TenMillion = 10000000
 
-func OpenExtractedSubredditDatafile(basedir string, subreddit string, extractedType string) {
+func OpenExtractedSubredditDatafile(basedir string, subreddit string, extractedType string, progress *float64) string {
+	retStr := ""
 	var commentData []map[string]string
 
-	for _, v := range AllMonths {
+	for i, v := range AllMonths {
 		fmt.Println("Reading " + v)
 		var tempCommData []map[string]string
 		str := basedir + "/" + v + "/" + "subreddit_" + subreddit + "_" + extractedType
@@ -34,20 +35,29 @@ func OpenExtractedSubredditDatafile(basedir string, subreddit string, extractedT
 			log.Println(err)
 		}
 		commentData = append(commentData, tempCommData...)
+		*progress = 0.5 * ((float64(i) + 1.0) * percentPerMonth)
 	}
 	fmt.Println(strconv.Itoa(len(commentData)) + " total comments")
+	*progress = 50
 
 	fmt.Println("Tallying word and karma counts...")
 	tallies, karmas := tallyWordOccurrences(commentData)
 	for _, v := range tallies[:10] {
 		percent := (float64(v.TotalCount) / float64(len(commentData))) * 100.0
-		fmt.Println(v.Word + ": " + strconv.FormatInt(v.TotalCount, 10) + " comment occurrences (" +
-			strconv.FormatFloat(percent, 'f', 3, 64) + "%)")
+		str := v.Word + ": " + strconv.FormatInt(v.TotalCount, 10) + " comment occurrences (" +
+			strconv.FormatFloat(percent, 'f', 3, 64) + "%)"
+		retStr += str + "\n"
+		fmt.Println(str)
 	}
+	*progress = 75
 	fmt.Println("getting karmas")
 	for _, karma := range karmas[:10] {
-		fmt.Println(karma.Word + ": " + strconv.FormatInt(karma.TotalKarma, 10) + " karma total")
+		str := karma.Word + ": " + strconv.FormatInt(karma.TotalKarma, 10) + " karma total"
+		retStr += str + "\n"
+		fmt.Println(str)
 	}
+	*progress = 100
+	return retStr
 }
 
 func sortKarma(karmaCounts map[string]IntPair) KarmaList {
