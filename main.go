@@ -1,11 +1,13 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/denverquane/redditcommentanalysis/selection"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -32,28 +34,52 @@ func run(port string) error {
 
 func checkForExtractedSubs(year string, schema string) {
 	dir := os.Getenv("BASE_DATA_DIRECTORY") + "/" + year + "/"
-	arr := selection.ScanDirForExtractedSubData(dir+"Jan", schema)
 
-	//register all the entries found in january
-	for _, sub := range arr {
-		//TODO actually insert status (total comments?) for a given subreddit
-		subredditStatuses[sub] = subredditStatus{extracting: false, extractedSummary: "gh", processing: false, processedSummary: ""}
-	}
+	for _, month := range selection.AllMonths {
+		arr := selection.ScanDirForExtractedSubData(dir+month, schema) //scan the current month folder for all subs
 
-	for _, v := range selection.AllMonths {
-		arr := selection.ScanDirForExtractedSubData(dir+v, schema) //scan the current month folder for all subs
-		for prevSubName := range subredditStatuses {               //get all recorded subreddit statuses
-			found := false
-			for _, newSubName := range arr { //all the entries for this current month need to be found in the registry
-				if newSubName == prevSubName {
-					found = true
-					break
+		for _, sub := range arr {
+			fmt.Println("Checking " + sub)
+			var commentCount int64
+			str := os.Getenv("BASE_DATA_DIRECTORY") + "/" + year + "/" + month + "/" + "subreddit_" + sub + "_" + schema + "_count"
+			plan, fileOpenErr := ioutil.ReadFile(str)
+			if fileOpenErr != nil {
+				log.Println("Failed to open " + str + ", now opening datafile and writing total comment count to file")
+				var comments []map[string]string
+				str := os.Getenv("BASE_DATA_DIRECTORY") + "/" + year + "/" + month + "/" + "subreddit_" + sub + "_" + schema
+				plan, fileOpenErr := ioutil.ReadFile(str)
+				if fileOpenErr != nil {
+					log.Fatal("failed to open " + str)
+				}
+				err := json.Unmarshal(plan, &comments)
+				if err != nil {
+					log.Println(err)
+				}
+				file, err2 := os.Create(os.Getenv("BASE_DATA_DIRECTORY") + "/" + year + "/" + month + "/" + "subreddit_" + sub + "_" + schema + "_count")
+				if err != nil {
+					log.Println(err2)
+				}
+				length := strconv.FormatInt(int64(len(comments)), 10)
+				file.Write([]byte(length))
+				fmt.Println("Wrote " + length + " to file for " + sub + " in " + month)
+
+				commentCount = int64(len(comments))
+				file.Close()
+			} else {
+				err := json.Unmarshal(plan, &commentCount)
+				if err != nil {
+					log.Fatal("Failed to unmarshal extracted data for " + sub)
+				} else {
+					fmt.Println("Extracted " + strconv.FormatInt(commentCount, 10))
 				}
 			}
-			if !found { //if an entry has been found in the registry, but not in the current directory
-				fmt.Println("Missing successive months for " + prevSubName)
-				delete(subredditStatuses, prevSubName)
-				break
+
+			if val, ok := subredditStatuses[sub]; ok {
+				val.ExtractedMonthCommentCounts[month] = commentCount
+			} else {
+				status := subredditStatus{Extracting: false, ExtractedMonthCommentCounts: make(map[string]int64, 1), Processing: false, ProcessedSummary: ""}
+				status.ExtractedMonthCommentCounts[month] = commentCount
+				subredditStatuses[sub] = status
 			}
 		}
 	}
@@ -67,23 +93,23 @@ var processSubQueue = make([]string, 0)
 var subredditStatuses = make(map[string]subredditStatus)
 
 type subredditStatus struct {
-	extracting       bool
-	extractedSummary string
-	processing       bool
-	processedSummary string
+	Extracting                  bool
+	ExtractedMonthCommentCounts map[string]int64
+	Processing                  bool
+	ProcessedSummary            string
 }
 
 func (status subredditStatus) ToString() string {
-	str := "Extracting: " + strconv.FormatBool(status.extracting) + "\n"
+	str := "Extracting: " + strconv.FormatBool(status.Extracting) + "\n"
 
-	if !status.extracting && status.extractedSummary != "" {
-		str += "Extracted summary: " + status.extractedSummary + "\n"
+	if !status.Extracting && len(status.ExtractedMonthCommentCounts) != 0 {
+		str += "Extracted summary: " + "\n"
 	}
 
-	str += "Processing: " + strconv.FormatBool(status.processing) + "\n"
+	str += "Processing: " + strconv.FormatBool(status.Processing) + "\n"
 
-	if !status.processing && status.processedSummary != "" {
-		str += "Processed summary: " + status.processedSummary + "\n"
+	if !status.Processing && status.ProcessedSummary != "" {
+		str += "Processed summary: " + status.ProcessedSummary + "\n"
 	}
 
 	return str
@@ -116,22 +142,22 @@ func main() {
 func makeMuxRouter() http.Handler {
 	muxRouter := mux.NewRouter()
 
-	muxRouter.HandleFunc("/", handleIndex).Methods("GET")
-	muxRouter.HandleFunc("/status", handleStatus).Methods("GET")
-	muxRouter.HandleFunc("/subs", handleGetSubs)
-	muxRouter.HandleFunc("/extractSub/{subreddit}", handleExtractSub).Methods("GET")
-	muxRouter.HandleFunc("/status/{subreddit}", handleViewStatus).Methods("GET")
-	muxRouter.HandleFunc("/processSub/{subreddit}", handleProcessSub).Methods("GET")
+	muxRouter.HandleFunc("/api", handleIndex).Methods("GET")
+	muxRouter.HandleFunc("/api/status", handleStatus).Methods("GET", "OPTIONS")
+	muxRouter.HandleFunc("/api/subs", handleGetSubs).Methods("GET")
+	muxRouter.HandleFunc("/api/extractSub/{subreddit}", handleExtractSub).Methods("POST")
+	muxRouter.HandleFunc("/api/status/{subreddit}", handleViewStatus).Methods("GET")
+	muxRouter.HandleFunc("/api/processSub/{subreddit}", handleProcessSub).Methods("POST")
 	return muxRouter
 }
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "Welcome to the Reddit Comment Extractor!\nThese are the endpoints to use:\n")
-	io.WriteString(w, "GET \"/status\" displays the overall status of this server and its data processing\n")
-	io.WriteString(w, "GET \"/subs\" lists all subreddits with all comments extracted and/or processed\n")
-	io.WriteString(w, "GET \"/extractSub/<sub>\" extracts ALL comments from the <sub> subreddit, and saves to a datafile for later processing\n")
-	io.WriteString(w, "GET \"/processSub/<sub>\" processes the previously-extracted data for a subreddit, and saves these processed analytics for later retrieval\n")
-	io.WriteString(w, "GET \"/status/<sub>\" displays the extraction and processing status for a subreddit\n")
+	io.WriteString(w, "GET \"/api/status\" displays the overall status of this server and its data Processing\n")
+	io.WriteString(w, "GET \"/api/subs\" lists all subreddits with all comments extracted and/or processed\n")
+	io.WriteString(w, "POST \"/api/extractSub/<sub>\" extracts ALL comments from the <sub> subreddit, and saves to a datafile for later Processing\n")
+	io.WriteString(w, "POST \"/api/processSub/<sub>\" processes the previously-extracted data for a subreddit, and saves these processed analytics for later retrieval\n")
+	io.WriteString(w, "GET \"/api/status/<sub>\" displays the extraction and Processing status for a subreddit\n")
 	writeStdHeaders(w)
 }
 
@@ -140,8 +166,8 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 	if len(extractSubQueue) > 0 {
 		str += "These subreddits are in the queue and waiting to be extracted: \n"
 		for i, v := range extractSubQueue {
-			if vv, ok := subredditStatuses[v]; ok && vv.extracting {
-				str += strconv.Itoa(i+1) + ". " + v + " (currently extracting, " + strconv.FormatFloat(extractingProg, 'f', 2, 64) + "% complete)\n"
+			if vv, ok := subredditStatuses[v]; ok && vv.Extracting {
+				str += strconv.Itoa(i+1) + ". " + v + " (currently Extracting, " + strconv.FormatFloat(extractingProg, 'f', 2, 64) + "% complete)\n"
 			} else {
 				str += strconv.Itoa(i+1) + ". " + v + "\n"
 			}
@@ -153,14 +179,14 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 	if len(processSubQueue) > 0 {
 		str += "These subreddits are in the queue and waiting to be processed: \n"
 		for i, v := range processSubQueue {
-			if vv, ok := subredditStatuses[v]; ok && vv.processing {
-				str += strconv.Itoa(i+1) + ". " + v + " (currently processing, " + strconv.FormatFloat(processingProg, 'f', 2, 64) + "% complete)\n"
+			if vv, ok := subredditStatuses[v]; ok && vv.Processing {
+				str += strconv.Itoa(i+1) + ". " + v + " (currently Processing, " + strconv.FormatFloat(processingProg, 'f', 2, 64) + "% complete)\n"
 			} else {
 				str += strconv.Itoa(i+1) + ". " + v + "\n"
 			}
 		}
 	} else {
-		str += "Subreddit processing queue is empty: waiting for jobs!"
+		str += "Subreddit Processing queue is empty: waiting for jobs!"
 	}
 
 	io.WriteString(w, str)
@@ -168,19 +194,26 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleGetSubs(w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, "Subreddits already extracted:\n")
-	for sub, v := range subredditStatuses {
-		if v.extractedSummary != "" {
-			io.WriteString(w, sub+"\n")
-		}
+	bytes, err := json.Marshal(subredditStatuses)
+	if err != nil {
+		fmt.Println(err)
 	}
-	io.WriteString(w, "\nSubreddits already processed:\n")
-	for sub, v := range subredditStatuses {
-		if v.processedSummary != "" {
-			io.WriteString(w, sub+"\n")
-		}
-	}
-	writeStdHeaders(w)
+
+	//for sub, v := range subredditStatuses {
+	//	if v.ExtractedSummary != "" {
+	//		io.WriteString(w, sub+"\n")
+	//	}
+	//}
+	//io.WriteString(w, "\nSubreddits already processed:\n")
+	//for sub, v := range subredditStatuses {
+	//	if v.ProcessedSummary != "" {
+	//		io.WriteString(w, sub+"\n")
+	//	}
+	//}
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Add("Access-Control-Allow-Methods", "PUT, GET, POST")
+	w.Header().Add("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+	io.WriteString(w, string(bytes))
 }
 
 func handleExtractSub(w http.ResponseWriter, r *http.Request) {
@@ -188,8 +221,8 @@ func handleExtractSub(w http.ResponseWriter, r *http.Request) {
 	subreddit := vars["subreddit"]
 
 	if val, ok := subredditStatuses[subreddit]; ok {
-		if val.extracting || val.extractedSummary != "" {
-			io.WriteString(w, "Subreddit "+subreddit+" has been extracted, is extracting, or is in the queue for extraction!\n")
+		if val.Extracting || len(val.ExtractedMonthCommentCounts) != 0 {
+			io.WriteString(w, "Subreddit "+subreddit+" has been extracted, is Extracting, or is in the queue for extraction!\n")
 			io.WriteString(w, val.ToString())
 		}
 	} else {
@@ -218,17 +251,20 @@ func extractQueue() {
 	for len(extractSubQueue) > 0 {
 		tempSub = extractSubQueue[0]
 		if v, ok := subredditStatuses[tempSub]; !ok {
-			subredditStatuses[tempSub] = subredditStatus{extracting: true, extractedSummary: "", processing: false, processedSummary: ""}
+			subredditStatuses[tempSub] = subredditStatus{Extracting: true,
+				ExtractedMonthCommentCounts: make(map[string]int64, 0), Processing: false, ProcessedSummary: ""}
 		} else {
-			v.extracting = true
+			v.Extracting = true
 			subredditStatuses[tempSub] = v
 		}
-		str := selection.SaveCriteriaDataToFile("subreddit", tempSub, "2016",
+		_ = selection.SaveCriteriaDataToFile("subreddit", tempSub, "2016",
 			os.Getenv("BASE_DATA_DIRECTORY"), selection.BasicSchema, &extractingProg)
 
 		v := subredditStatuses[tempSub]
-		v.extracting = false
-		v.extractedSummary = str
+		v.Extracting = false
+
+		//TODO fix
+		//v.ExtractedSummary = str
 		subredditStatuses[tempSub] = v
 		extractSubQueue = extractSubQueue[1:] //done
 		fmt.Println("COMPLETED")
@@ -240,16 +276,16 @@ func handleProcessSub(w http.ResponseWriter, r *http.Request) {
 	subreddit := vars["subreddit"]
 
 	if val, ok := subredditStatuses[subreddit]; ok {
-		if val.processing {
+		if val.Processing {
 			io.WriteString(w, "Subreddit \""+subreddit+"\" is still being processed!")
-		} else if val.processedSummary != "" {
-			io.WriteString(w, "Subreddit \""+subreddit+"\" has already been processed:\n"+val.extractedSummary)
-		} else if val.extracting {
+		} else if val.ProcessedSummary != "" {
+			io.WriteString(w, "Subreddit \""+subreddit+"\" has already been processed:\n")
+		} else if val.Extracting {
 			io.WriteString(w, "Subreddit \""+subreddit+"\" is still being extracted")
-		} else if val.extractedSummary != "" {
+		} else if len(val.ExtractedMonthCommentCounts) != 0 {
 			processSubQueue = append(processSubQueue, subreddit)
 
-			io.WriteString(w, subreddit+" appended to processing queue!\nNew job queue:\n")
+			io.WriteString(w, subreddit+" appended to Processing queue!\nNew job queue:\n")
 			str := ""
 			for i, v := range processSubQueue {
 				str += strconv.Itoa(i+1) + ". " + v + "\n"
@@ -276,14 +312,14 @@ func processQueue() {
 		if v, ok := subredditStatuses[tempSub]; !ok {
 			log.Fatal("Tried to process a sub not found in the registry!")
 		} else {
-			v.processing = true
+			v.Processing = true
 			subredditStatuses[tempSub] = v
 		}
 		str := selection.OpenExtractedSubredditDatafile(os.Getenv("BASE_DATA_DIRECTORY")+"/"+"2016", tempSub, "Basic", &processingProg)
 
 		v := subredditStatuses[tempSub]
-		v.processing = false
-		v.processedSummary = str
+		v.Processing = false
+		v.ProcessedSummary = str
 		subredditStatuses[tempSub] = v
 		processSubQueue = processSubQueue[1:] //done
 		fmt.Println("COMPLETED")
@@ -304,6 +340,6 @@ func handleViewStatus(w http.ResponseWriter, r *http.Request) {
 
 func writeStdHeaders(w http.ResponseWriter) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Add("Access-Control-Allow-Methods", "GET")
-	w.Header().Add("Access-Control-Allow-Headers", "Content-Type")
+	w.Header().Add("Access-Control-Allow-Methods", "PUT, GET, POST")
+	w.Header().Add("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
 }

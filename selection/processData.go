@@ -34,6 +34,7 @@ func OpenExtractedSubredditDatafile(basedir string, subreddit string, extractedT
 		if err != nil {
 			log.Println(err)
 		}
+		fmt.Println(subreddit + " has " + strconv.FormatInt(int64(len(tempCommData)), 10) + " comments in " + v)
 		commentData = append(commentData, tempCommData...)
 		*progress = 0.5 * ((float64(i) + 1.0) * percentPerMonth)
 	}
@@ -177,20 +178,28 @@ func dumpDataToFilepath(data []map[string]string, filePath string) {
 	if err != nil {
 		log.Println(err)
 	}
+	defer f.Close()
 
-	bytess, err2 := json.Marshal(data)
+	f2, err2 := os.Create(filePath + "_count")
 	if err2 != nil {
 		log.Println(err2)
 	}
+	defer f2.Close()
+	length := strconv.FormatInt(int64(len(data)), 10)
+	f2.Write([]byte(length))
+
+	bytess, err3 := json.Marshal(data)
+	if err3 != nil {
+		log.Println(err3)
+	}
 	f.Write(bytess)
-	f.Close()
 }
 
 func ScanDirForExtractedSubData(directory string, schema string) []string {
 	subs := make([]string, 0)
 	dirList, _ := ioutil.ReadDir(directory)
 	for _, v := range dirList {
-		if strings.Contains(v.Name(), "subreddit_") && strings.Contains(v.Name(), "_"+schema) {
+		if strings.Contains(v.Name(), "subreddit_") && strings.Contains(v.Name(), "_"+schema) && !strings.Contains(v.Name(), "_count") {
 			str := strings.Replace(v.Name(), "subreddit_", "", -1)
 			str = strings.Replace(str, "_"+schema, "", -1)
 			subs = append(subs, str)
