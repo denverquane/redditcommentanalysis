@@ -14,14 +14,15 @@ class App extends Component {
   render() {
     return (
       <div className="App">
-        <header className="App-header">
+        <header className="App-header"> 
           <img src={logo} className="App-logo" alt="logo" />
-          <button onClick={() => this.getBlocks()}>
+          
+        </header>
+        <button onClick={() => this.getSubs()}>
             Fetch Subs
             </button>
             {this.displaySubs()}
               {/* {this.state.Subs.EarthPorn ? (this.state.Subs.EarthPorn.Processing ? <p>'True'</p> : <p>'False'</p>) : ''} */}
-        </header>
       </div>
     );
   }
@@ -48,8 +49,8 @@ class App extends Component {
       return arr
   }
 
-  getBlocks() {
-      fetch('http://localhost:5000/api/subs')
+  getSubs() {
+      fetch('http://dquane.tplinkdns.com:5000/api/subs')
           .then(results => {
               return results.json();
           }).then(data => {
