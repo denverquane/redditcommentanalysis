@@ -3,8 +3,10 @@ package selection
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"github.com/valyala/fastjson"
+	"io/ioutil"
 	"log"
 	"os"
 	"strconv"
@@ -44,16 +46,28 @@ func getCommentDataFromLine(line []byte, keyTypes map[string]string) map[string]
 
 const percentPerMonth = (1.0 / 12.0) * 100.0
 
-func SaveCriteriaDataToFile(criteria string, value string, year string, basedir string, schema commentSchema, progress *float64) string {
-	summary := ""
+func SaveCriteriaDataToFile(criteria string, value string, year string, basedir string, schema commentSchema, progress *float64) map[string]int64 {
+	summary := make(map[string]int64)
 	criteria = strings.ToLower(criteria)
 	value = strings.ToLower(value)
 	for mIndex, v := range AllMonths {
 		relevantComments := make([]map[string]string, 0)
 		str := basedir + "/" + year + "/" + v + "/" + criteria + "_" + value + "_" + schema.name
 		if _, err := os.Stat(str); !os.IsNotExist(err) {
+			str2 := str + "_count"
+			if _, err := os.Stat(str2); !os.IsNotExist(err) {
+				var count int64
+				plan, fileOpenErr := ioutil.ReadFile(str2)
+				if fileOpenErr != nil {
+					log.Fatal("failed to open " + str)
+				}
+				err := json.Unmarshal(plan, &count)
+				if err != nil {
+					log.Fatal(err)
+				}
+				summary[v] = count
+			}
 			fmt.Println("Found cached data for " + str)
-			summary += "Found cached data for " + str + "\n"
 			continue
 		} else {
 			fmt.Println("No cached data found for " + str)
@@ -82,13 +96,13 @@ func SaveCriteriaDataToFile(criteria string, value string, year string, basedir 
 
 		reader := bufio.NewReaderSize(file, 4096)
 
-		var linesRead uint64 = 0
+		var linesRead int64 = 0
 		startTime := time.Now()
 		tempTime := startTime
 		for {
 			line := recurseBuildCompleteLine(reader)
 			if line == nil {
-				fmt.Println("Lines: " + strconv.FormatUint(linesRead, 10))
+				fmt.Println("Lines: " + strconv.FormatInt(linesRead, 10))
 				log.Println("Encountered error; concluding analysis")
 				break
 			}
@@ -105,19 +119,19 @@ func SaveCriteriaDataToFile(criteria string, value string, year string, basedir 
 					fmt.Println("Percent complete with " + v + ": " + strconv.FormatFloat(percentDone, 'f', 2, 64) + "%")
 					*progress = (percentPerMonth * float64(mIndex)) + (percentPerMonth * (percentDone / 100.0))
 				} else {
-					fmt.Println("Lines complete: " + strconv.FormatUint(linesRead, 10))
+					fmt.Println("Lines complete: " + strconv.FormatInt(linesRead, 10))
 				}
 				fmt.Println("Processed 100k lines in " + time.Now().Sub(tempTime).String())
 				tempTime = time.Now()
 			}
 		}
 		dif := time.Now().Sub(startTime).String()
-		tempStr := "Took " + dif + " to search " + strconv.FormatUint(linesRead, 10) + " comments of file " + buffer.String() + "\n"
+		tempStr := "Took " + dif + " to search " + strconv.FormatInt(linesRead, 10) + " comments of file " + buffer.String() + "\n"
 		if len(relevantComments) == 0 {
 			log.Println("Found 0 comments for " + criteria + ":" + value + " in " + v + ", exiting extraction!")
-			return "ERROR"
+			return summary
 		}
-		summary += tempStr
+		summary[v] = linesRead
 		fmt.Println(tempStr)
 		dumpDataToFilepath(relevantComments, str)
 		*progress = percentPerMonth * float64(mIndex+1.0)
