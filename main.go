@@ -219,7 +219,7 @@ func handleMessages() {
 		// Grab the next message from the broadcast channel
 		msg := <-broadcast
 		// Send it out to every client that is currently connected
-		fmt.Println("Have msg to transmit")
+		//fmt.Println("Have msg to transmit")
 		for client := range clients {
 			err := client.WriteJSON(msg)
 			if err != nil {
@@ -302,7 +302,7 @@ func handleGetSubs(w http.ResponseWriter, r *http.Request) {
 func handleExtractSub(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	subreddit := vars["subreddit"]
-
+	writeStdHeaders(w)
 	if val, ok := subredditStatuses[subreddit]; ok {
 		if val.Extracting || len(val.ExtractedMonthCommentCounts) != 0 {
 			io.WriteString(w, "Subreddit "+subreddit+" has been extracted, is Extracting, or is in the queue for extraction!\n")
@@ -323,7 +323,6 @@ func handleExtractSub(w http.ResponseWriter, r *http.Request) {
 		}
 		io.WriteString(w, str)
 	}
-	writeStdHeaders(w)
 }
 
 var extractingProg float64
@@ -341,6 +340,7 @@ func extractQueue() {
 			subredditStatuses[tempSub] = v
 			extractingProg = 0
 		}
+		go monitorProgress(&extractingProg)
 		summary := selection.SaveCriteriaDataToFile("subreddit", tempSub, "2016",
 			os.Getenv("BASE_DATA_DIRECTORY"), selection.BasicSchema, &extractingProg)
 
@@ -421,7 +421,6 @@ func monitorProgress(prog *float64) {
 			break
 		} else if (*prog) != prev {
 			prev = *prog
-			fmt.Println("Broadcasting to check status")
 			broadcast <- "status"
 		}
 		time.Sleep(time.Second)

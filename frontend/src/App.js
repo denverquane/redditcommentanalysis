@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import logo from './logo.svg';
 import './App.css';
-import { Button, Collapse, Toaster, Position, Intent, Spinner} from '@blueprintjs/core'
+import { Button, Collapse, Toaster, Position, Intent, Spinner, InputGroup} from '@blueprintjs/core'
 import { Circle } from 'rc-progress'
 import { LineChart, BarChart, Legend, XAxis, YAxis, Bar, CartesianGrid, Line, Tooltip} from 'recharts'
 import Sockette from 'sockette';
@@ -56,10 +56,12 @@ class App extends Component {
     state = {
         Websocket: Boolean,
         Subs: Object,
-        Status: Object
+        Status: Object,
+        TempExtractName: String,
     };
     constructor(){
         super();
+        this.state.Websocket = false;
         this.getStatus();
     }
 
@@ -109,6 +111,15 @@ class App extends Component {
         {/*<button onClick={() => this.getSubs()}>*/}
             {/*Fetch Subs*/}
         {/*</button>*/}
+        <div style={{width: '100%', display: 'flex', flexDirection: 'row'}}>
+            <div style={{width: '25%'}}/>
+            <div style={{width: '35%'}}><InputGroup
+                onChange={(event) => (this.setState({...this.state, TempExtractName: event.target.value}))}/></div>
+            <div style={{width: '15%'}}><Button onClick={() => {
+                this.extractSubreddit(this.state.TempExtractName);
+                console.log(this.state.TempExtractName);
+            }}>Extract Sub</Button></div>
+        </div>
             {this.displaySubs()}
               {/* {this.state.Subs.EarthPorn ? (this.state.Subs.EarthPorn.Processing ? <p>'True'</p> : <p>'False'</p>) : ''} */}
       </div>
@@ -166,12 +177,9 @@ class App extends Component {
           .then(results => {
               return results.json();
           }).then(data => {
-
           if (JSON.stringify(this.state.Status) !== JSON.stringify(data)) {
-              console.log('Updated' + data.ExtractProgress);
               this.setState({ ...this.state, Status: data });
           }
-
       });
   }
 
@@ -205,9 +213,22 @@ class App extends Component {
               return results;
           }).then(data => {
               console.log(data);
-          AppToaster.show({message: 'Backend starting processing ' + sub, intent: Intent.SUCCESS});
+              AppToaster.show({message: 'Asked backend to process: ' + sub, intent: Intent.NONE});
+              this.getStatus();
       });
   }
+    extractSubreddit(sub){
+        fetch('http://localhost:5000/api/extractSub/' + sub, {
+            method: 'post'
+        })
+            .then(results => {
+                return results;
+            }).then(data => {
+            console.log(data);
+            AppToaster.show({message: 'Asked backend to extract: ' + sub, intent: Intent.NONE});
+            this.getStatus();
+        });
+    }
 }
 
 export class CollapseExample extends React.Component {
