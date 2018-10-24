@@ -434,6 +434,9 @@ func handleViewStatus(w http.ResponseWriter, r *http.Request) {
 	if val, ok := subredditStatuses[subreddit]; !ok {
 		io.WriteString(w, "{}")
 	} else {
+		if len(subredditStatuses[subreddit].ExtractedMonthCommentCounts) != 12 {
+			val.ExtractedMonthCommentCounts = make(map[string]int64)
+		}
 		data, _ := json.Marshal(val)
 		io.WriteString(w, string(data))
 	}

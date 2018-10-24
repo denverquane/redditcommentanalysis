@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import logo from './logo.svg';
 import './App.css';
-import { Button, Collapse, Toaster, Position, Intent, Spinner, InputGroup} from '@blueprintjs/core'
+import { Button, Collapse, Toaster, Position, Intent, Spinner, InputGroup, Card, Elevation, Tag} from '@blueprintjs/core'
 import { Circle } from 'rc-progress'
 import { LineChart, BarChart, Legend, XAxis, YAxis, Bar, CartesianGrid, Line, Tooltip} from 'recharts'
 import Sockette from 'sockette';
@@ -9,7 +9,7 @@ import Sockette from 'sockette';
 import '@blueprintjs/core/lib/css/blueprint.css';
 
 let Months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-let IP = "dquane.tplinkdns.com"
+let IP = "localhost";
 
 const AppToaster = Toaster.create({
     className: "notifyToaster",
@@ -39,6 +39,9 @@ class App extends Component {
             } else if (String(e.data).includes("status")) {
                 this.getStatus();
                 console.log('Status message')
+            } else if (String(e.data).includes("error")) {
+                console.log('Error message');
+                AppToaster.show({message: 'Error!' + e.data, intent: Intent.DANGER});
             }
         },
         onreconnect: e => console.log('Reconnecting...', e),
@@ -105,13 +108,6 @@ class App extends Component {
                 {this.getLabels(this.state.Status.ProcessQueue)}
             </div>
         </header>
-          {/*<button onClick={() => this.getStatus()}>*/}
-              {/*Refresh Status*/}
-          {/*</button>*/}
-
-        {/*<button onClick={() => this.getSubs()}>*/}
-            {/*Fetch Subs*/}
-        {/*</button>*/}
         <div style={{width: '100%', display: 'flex', flexDirection: 'row'}}>
             <div style={{width: '25%'}}/>
             <div style={{width: '35%'}}><InputGroup
@@ -132,9 +128,20 @@ class App extends Component {
         let months = [];
         let totalComments = 0;
         let substatus = this.state.Subs[key];
+        if (!substatus.ExtractedMonthCommentCounts || substatus.ExtractedMonthCommentCounts.length < 12){
+            continue
+        }
+        let all = true;
         for (let mo in Months) {
+            if (!substatus.ExtractedMonthCommentCounts[Months[mo]]) {
+                all = false
+                break
+            }
             months.push({key: Months[mo], comments: substatus.ExtractedMonthCommentCounts[Months[mo]]});
             totalComments += substatus.ExtractedMonthCommentCounts[Months[mo]];
+        }
+        if (!all) {
+            continue
         }
         let words = [];
         for (let wo in substatus.ProcessedSummary.KeywordCommentTallies) {
@@ -143,12 +150,12 @@ class App extends Component {
         }
       arr.push(
 
-          <div key={key} style={{display: 'flex', flexDirection: 'column', marginBottom: '5%'}}>
-              <b>{key}</b>
-              ({totalComments.toLocaleString()} total comments)
-              <CollapseExample text={months}/>
-              {this.state.Subs[key].Processed ? <div><CollapseExample text={words}/></div> : this.processButton(key)}
-          </div>);
+          <Card key={key} style={{display: 'flex', backgroundColor: '#ECEBEB', flexDirection: 'column', marginBottom: '1%'}} elevation={Elevation.TWO} interactive={true}>
+              <h1>{key}</h1>
+                  ({totalComments.toLocaleString()} total comments)
+                  <CollapseExample text={{label: 'Monthly Data', type: 'months', months: months}}/>
+              {this.state.Subs[key].Processed ? <div><CollapseExample text={{label: 'Keyword Data', type: 'karma', words: words}}/></div> : this.processButton(key)}
+          </Card>);
     }
       arr.sort(function(a,b){
           var x = a.key.toLowerCase();
@@ -191,9 +198,21 @@ class App extends Component {
       }
       for (let i in queue) {
           if (i === "0") {
-              arr.push(<div key={i}>{i}. {queue[i]}</div>)
+              arr.push(
+                  <div>
+                    <div style={{width: '33%'}}/>
+                    <Tag key={i} intent={Intent.SUCCESS} style={{width: '33%', marginBottom: '1%'}}>{i}. {queue[i]} </Tag>
+                    <div style={{width: '33%'}}/>
+                  </div>
+              )
           } else {
-              arr.push(<div key={i}>{i}. {queue[i]}</div>)
+              arr.push(
+                  <div>
+                      <div style={{width: '33%'}}/>
+                      <Tag key={i} intent={Intent.NONE} style={{width: '33%'}}>{i}. {queue[i]}</Tag>
+                      <div style={{width: '33%'}}/>
+                  </div>
+              )
           }
 
       }
@@ -201,7 +220,7 @@ class App extends Component {
   }
 
   processButton(subreddit){
-        return <div><Button onClick={() => this.processSubreddit(subreddit)}>
+        return <div><Button intent={Intent.WARNING} onClick={() => this.processSubreddit(subreddit)}>
             Process {subreddit}
         </Button></div>
   }
@@ -249,21 +268,33 @@ export class CollapseExample extends React.Component {
         let width = document.documentElement.clientWidth
         return (
             <div>
-                <Button onClick={this.handleClick}>
-                    {this.state.isOpen ? "Hide" : "Show"} Details
+                <Button intent={Intent.PRIMARY} onClick={this.handleClick}>
+                    {this.state.isOpen ? "Hide" : "Show"} {this.state.text.text.label}
                 </Button>
-                <Collapse isOpen={this.state.isOpen}>
-
-                    <BarChart width={width * 0.9} height={500} data={this.state.text.text} margin={{left: width*0.05}}>
-                        <XAxis dataKey="key"/>
-                        <YAxis />
-                        <CartesianGrid stroke="#eee" strokeDasharray="5 5"/>
-                        <Bar dataKey="Percent of Comments Containing" fill="blue" />\
-                        <Bar dataKey="Karma per Comment Containing" fill="red" />\
-                        <Tooltip/>
-                        <Legend/>
-                    </BarChart>
-                </Collapse>
+                {this.state.text.text.type === 'months' ?
+                    <Collapse isOpen={this.state.isOpen}>
+                        <LineChart width={width * 0.9} height={500} data={this.state.text.text.months} margin={{left: width*0.05}}>
+                            <XAxis dataKey="key"/>
+                            <YAxis />
+                            <CartesianGrid stroke="#eee" strokeDasharray="5 5"/>
+                            <Line dataKey="comments" fill="blue" />\
+                            <Tooltip/>
+                            <Legend/>
+                        </LineChart>
+                    </Collapse>
+                    :
+                    <Collapse isOpen={this.state.isOpen}>
+                        <BarChart width={width * 0.9} height={500} data={this.state.text.text.words} margin={{left: width*0.05}}>
+                            <XAxis dataKey="key"/>
+                            <YAxis />
+                            <CartesianGrid stroke="#eee" strokeDasharray="5 5"/>
+                            <Bar dataKey="Percent of Comments Containing" fill="blue" />\
+                            <Bar dataKey="Karma per Comment Containing" fill="red" />\
+                            <Tooltip/>
+                            <Legend/>
+                        </BarChart>
+                    </Collapse>
+                }
             </div>
         );
     }
