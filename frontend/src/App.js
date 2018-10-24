@@ -1,14 +1,60 @@
 import React, { Component } from 'react';
 import logo from './logo.svg';
 import './App.css';
-import { Button, Collapse } from '@blueprintjs/core'
+import { Button, Collapse, Toaster, Position, Intent, Spinner} from '@blueprintjs/core'
 import { Circle } from 'rc-progress'
 import { LineChart, BarChart, Legend, XAxis, YAxis, Bar, CartesianGrid, Line, Tooltip} from 'recharts'
+import Sockette from 'sockette';
+
+import '@blueprintjs/core/lib/css/blueprint.css';
 
 let Months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+const AppToaster = Toaster.create({
+    className: "notifyToaster",
+    position: Position.TOP
+});
+
+
 class App extends Component {
+
+    ws = new Sockette('ws://localhost:5000/ws', {
+        timeout: 5e3,
+        maxAttempts: 10,
+        onopen: (e) => {
+            console.log('Connected!', e);
+            AppToaster.show({message: 'Connected to Backend!', intent: Intent.SUCCESS});
+            this.getSubs();
+            this.getStatus();
+            this.setState({...this.state, Websocket: true});
+        },
+        onmessage: (e) => {
+            console.log('Received:', e);
+            console.log(String(e.data));
+            if (String(e.data).includes("fetch")) {
+                this.getSubs();
+                this.getStatus();
+                console.log('Fetch message')
+            } else if (String(e.data).includes("status")) {
+                this.getStatus();
+                console.log('Status message')
+            }
+        },
+        onreconnect: e => console.log('Reconnecting...', e),
+        onmaximum: e => console.log('Stop Attempting!', e),
+        onclose: (e) => {
+            console.log('Closed!', e);
+            AppToaster.show({message: 'Disconnected from backend!', intent: Intent.DANGER});
+            this.setState({...this.state, Websocket: false});
+        },
+        onerror: (e) => {
+            console.log('Error!', e);
+            AppToaster.show({message: 'Error connecting to backend!', intent: Intent.DANGER});
+            this.setState({...this.state, Websocket: false});
+        },
+    });
     state = {
+        Websocket: Boolean,
         Subs: Object,
         Status: Object
     };
@@ -37,7 +83,8 @@ class App extends Component {
                         Nothing to Extract!
                     </div>
                 }
-                <img style={{width: '60%'}} src={logo} className="App-logo" alt="logo" />
+                {<div style={{width: '60%'}}><Spinner intent={this.state.Websocket ? Intent.SUCCESS : Intent.DANGER}
+                               value={this.state.Websocket ? (this.state.Status.Extracting || this.state.Status.Processing) ? null : 1 : 1}/> </div>}
                 {this.state.Status.Processing ?
                     (
                         <div style={{width: '20%', height: '20%'}}>
@@ -55,14 +102,13 @@ class App extends Component {
                 {this.getLabels(this.state.Status.ProcessQueue)}
             </div>
         </header>
+          {/*<button onClick={() => this.getStatus()}>*/}
+              {/*Refresh Status*/}
+          {/*</button>*/}
 
-          <button onClick={() => this.getStatus()}>
-              Refresh Status
-          </button>
-
-        <button onClick={() => this.getSubs()}>
-            Fetch Subs
-        </button>
+        {/*<button onClick={() => this.getSubs()}>*/}
+            {/*Fetch Subs*/}
+        {/*</button>*/}
             {this.displaySubs()}
               {/* {this.state.Subs.EarthPorn ? (this.state.Subs.EarthPorn.Processing ? <p>'True'</p> : <p>'False'</p>) : ''} */}
       </div>
@@ -158,7 +204,8 @@ class App extends Component {
           .then(results => {
               return results;
           }).then(data => {
-              console.log(data)
+              console.log(data);
+          AppToaster.show({message: 'Backend starting processing ' + sub, intent: Intent.SUCCESS});
       });
   }
 }
