@@ -9,6 +9,7 @@ import Sockette from 'sockette';
 import '@blueprintjs/core/lib/css/blueprint.css';
 
 let Months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+let IP = "dquane.tplinkdns.com"
 
 const AppToaster = Toaster.create({
     className: "notifyToaster",
@@ -18,7 +19,7 @@ const AppToaster = Toaster.create({
 
 class App extends Component {
 
-    ws = new Sockette('ws://localhost:5000/ws', {
+    ws = new Sockette('ws://' + IP + ':5000/ws', {
         timeout: 5e3,
         maxAttempts: 10,
         onopen: (e) => {
@@ -159,7 +160,7 @@ class App extends Component {
   }
 
   getSubs() {
-      fetch('http://localhost:5000/api/subs')
+      fetch('http://' + IP + ':5000/api/subs')
           .then(results => {
               return results.json();
           }).then(data => {
@@ -173,7 +174,7 @@ class App extends Component {
   }
 
   getStatus(){
-      fetch('http://localhost:5000/api/status')
+      fetch('http://' + IP + ':5000/api/status')
           .then(results => {
               return results.json();
           }).then(data => {
@@ -206,7 +207,7 @@ class App extends Component {
   }
 
   processSubreddit(sub){
-      fetch('http://localhost:5000/api/processSub/' + sub, {
+      fetch('http://' + IP + ':5000/api/processSub/' + sub, {
           method: 'post'
       })
           .then(results => {
@@ -218,7 +219,7 @@ class App extends Component {
       });
   }
     extractSubreddit(sub){
-        fetch('http://localhost:5000/api/extractSub/' + sub, {
+        fetch('http://' + IP + ':5000/api/extractSub/' + sub, {
             method: 'post'
         })
             .then(results => {
