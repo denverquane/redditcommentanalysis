@@ -77,14 +77,26 @@ func checkForExtractedSubs(year string, schema string) {
 			if val, ok := subredditStatuses[sub]; ok {
 				val.ExtractedMonthCommentCounts[month] = commentCount
 			} else {
-				status := subredditStatus{Extracting: false, ExtractedMonthCommentCounts: make(map[string]int64, 1), Processing: false, ProcessedSummary: ""}
+				status := subredditStatus{Extracting: false, ExtractedMonthCommentCounts: make(map[string]int64, 1), Processing: false, ProcessedSummary: selection.ProcessedSubredditStats{}}
 				status.ExtractedMonthCommentCounts[month] = commentCount
 				subredditStatuses[sub] = status
 			}
 		}
 	}
-	for sub := range subredditStatuses {
-		fmt.Println("Found all month's entries for " + sub)
+	for sub, val := range subredditStatuses {
+		all := true
+		for _, mon := range selection.AllMonths {
+			if _, ok := val.ExtractedMonthCommentCounts[mon]; !ok {
+				all = false
+			}
+		}
+		if all {
+			fmt.Println("Found ALL entries for " + sub)
+			val.Extracted = true
+			subredditStatuses[sub] = val
+		} else {
+			log.Println("Missing entries for " + sub)
+		}
 	}
 }
 
@@ -94,9 +106,11 @@ var subredditStatuses = make(map[string]subredditStatus)
 
 type subredditStatus struct {
 	Extracting                  bool
+	Extracted                   bool
 	ExtractedMonthCommentCounts map[string]int64
 	Processing                  bool
-	ProcessedSummary            string
+	Processed                   bool
+	ProcessedSummary            selection.ProcessedSubredditStats
 }
 
 func (status subredditStatus) ToString() string {
@@ -108,9 +122,9 @@ func (status subredditStatus) ToString() string {
 
 	str += "Processing: " + strconv.FormatBool(status.Processing) + "\n"
 
-	if !status.Processing && status.ProcessedSummary != "" {
-		str += "Processed summary: " + status.ProcessedSummary + "\n"
-	}
+	//if !status.Processing && status.ProcessedSummary != "" {
+	//	str += "Processed summary: " + status.ProcessedSummary + "\n"
+	//}
 
 	return str
 }
@@ -266,17 +280,18 @@ func extractQueue() {
 		tempSub = extractSubQueue[0]
 		if v, ok := subredditStatuses[tempSub]; !ok {
 			subredditStatuses[tempSub] = subredditStatus{Extracting: true,
-				ExtractedMonthCommentCounts: make(map[string]int64, 0), Processing: false, ProcessedSummary: ""}
+				ExtractedMonthCommentCounts: make(map[string]int64, 0), Processing: false, ProcessedSummary: selection.ProcessedSubredditStats{}}
 		} else {
 			v.Extracting = true
 			subredditStatuses[tempSub] = v
+			extractingProg = 0
 		}
 		summary := selection.SaveCriteriaDataToFile("subreddit", tempSub, "2016",
 			os.Getenv("BASE_DATA_DIRECTORY"), selection.BasicSchema, &extractingProg)
 
 		v := subredditStatuses[tempSub]
 		v.Extracting = false
-
+		v.Extracted = true
 		v.ExtractedMonthCommentCounts = summary
 		subredditStatuses[tempSub] = v
 		extractSubQueue = extractSubQueue[1:] //done
@@ -288,34 +303,33 @@ func handleProcessSub(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	subreddit := vars["subreddit"]
 
+	writeStdHeaders(w)
 	if val, ok := subredditStatuses[subreddit]; ok {
 		if val.Processing {
 			io.WriteString(w, "Subreddit \""+subreddit+"\" is still being processed!")
-		} else if val.ProcessedSummary != "" {
+		} else if val.Processed {
 			io.WriteString(w, "Subreddit \""+subreddit+"\" has already been processed:\n")
 		} else if val.Extracting {
 			io.WriteString(w, "Subreddit \""+subreddit+"\" is still being extracted")
-		} else if len(val.ExtractedMonthCommentCounts) != 0 {
+		} else if val.Extracted {
 			processSubQueue = append(processSubQueue, subreddit)
 
-			io.WriteString(w, subreddit+" appended to Processing queue!\nNew job queue:\n")
+			io.WriteString(w, "{ "+subreddit+" appended to Processing queue!\nNew job queue:\n")
 			str := ""
 			for i, v := range processSubQueue {
 				str += strconv.Itoa(i+1) + ". " + v + "\n"
 			}
-			subredditStatuses[subreddit] = subredditStatus{}
 
 			if len(processSubQueue) == 1 {
 				go processQueue() //this is the main goroutine that will process all the future jobs
 			}
-			io.WriteString(w, str)
+			io.WriteString(w, str+"}")
 		} else {
 			io.WriteString(w, "Subreddit has not been extracted or processed yet, please hit the endpoint \"/extractSub/"+subreddit+"\" to extract the subreddit data first")
 		}
 	} else {
 		io.WriteString(w, "Subreddit has not been extracted or processed yet, please hit the endpoint \"/extractSub/"+subreddit+"\" to extract the subreddit data first")
 	}
-	writeStdHeaders(w)
 }
 
 func processQueue() {
@@ -326,13 +340,15 @@ func processQueue() {
 			log.Fatal("Tried to process a sub not found in the registry!")
 		} else {
 			v.Processing = true
+			processingProg = 0
 			subredditStatuses[tempSub] = v
 		}
-		str := selection.OpenExtractedSubredditDatafile(os.Getenv("BASE_DATA_DIRECTORY")+"/"+"2016", tempSub, "Basic", &processingProg)
+		sum := selection.OpenExtractedSubredditDatafile(os.Getenv("BASE_DATA_DIRECTORY")+"/"+"2016", tempSub, "Basic", &processingProg)
 
 		v := subredditStatuses[tempSub]
 		v.Processing = false
-		v.ProcessedSummary = str
+		v.Processed = true
+		v.ProcessedSummary = sum
 		subredditStatuses[tempSub] = v
 		processSubQueue = processSubQueue[1:] //done
 		fmt.Println("COMPLETED")

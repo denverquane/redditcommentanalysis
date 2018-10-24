@@ -18,8 +18,16 @@ const HundredThousand = 100000
 const OneMillion = 1000000
 const TenMillion = 10000000
 
-func OpenExtractedSubredditDatafile(basedir string, subreddit string, extractedType string, progress *float64) string {
-	retStr := ""
+const TotalTallyAndKarmaRecords = 50
+
+type ProcessedSubredditStats struct {
+	KeywordCommentTallies map[string]float64 //How many comments contain the keyword
+	KeywordCommentKarmas  map[string]float64 //total karma for unique occurrences of the keyword
+
+}
+
+func OpenExtractedSubredditDatafile(basedir string, subreddit string, extractedType string, progress *float64) ProcessedSubredditStats {
+	retSummary := ProcessedSubredditStats{make(map[string]float64, 0), make(map[string]float64)}
 	var commentData []map[string]string
 
 	for i, v := range AllMonths {
@@ -43,22 +51,27 @@ func OpenExtractedSubredditDatafile(basedir string, subreddit string, extractedT
 
 	fmt.Println("Tallying word and karma counts...")
 	tallies, karmas := tallyWordOccurrences(commentData)
-	for _, v := range tallies[:10] {
+	for _, v := range tallies[:TotalTallyAndKarmaRecords] {
 		percent := (float64(v.TotalCount) / float64(len(commentData))) * 100.0
 		str := v.Word + ": " + strconv.FormatInt(v.TotalCount, 10) + " comment occurrences (" +
 			strconv.FormatFloat(percent, 'f', 3, 64) + "%)"
-		retStr += str + "\n"
+		retSummary.KeywordCommentTallies[v.Word] = percent
 		fmt.Println(str)
 	}
 	*progress = 75
 	fmt.Println("getting karmas")
-	for _, karma := range karmas[:10] {
-		str := karma.Word + ": " + strconv.FormatInt(karma.TotalKarma, 10) + " karma total"
-		retStr += str + "\n"
-		fmt.Println(str)
+
+	for _, v := range tallies[:TotalTallyAndKarmaRecords] {
+		for _, karma := range karmas {
+			if karma.Word == v.Word {
+				str := karma.Word + ": " + strconv.FormatInt(karma.TotalKarma, 10) + " karma total"
+				retSummary.KeywordCommentKarmas[karma.Word] = float64(karma.TotalKarma) / float64(karma.TotalCount)
+				fmt.Println(str)
+			}
+		}
 	}
 	*progress = 100
-	return retStr
+	return retSummary
 }
 
 func sortKarma(karmaCounts map[string]IntPair) KarmaList {
@@ -108,7 +121,7 @@ func (p TallyList) Len() int           { return len(p) }
 func (p TallyList) Less(i, j int) bool { return p[i].TotalCount < p[j].TotalCount }
 func (p TallyList) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
-const MaxGoRoutines = 8
+const MaxGoRoutines = 4
 
 func tallyWordOccurrences(comments []map[string]string) (TallyList, KarmaList) {
 	tallies := make(map[string]IntPair)
