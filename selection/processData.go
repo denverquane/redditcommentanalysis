@@ -38,16 +38,18 @@ func OpenExtractedSubredditDatafile(basedir string, subreddit string, extractedT
 		if fileOpenErr != nil {
 			log.Fatal("failed to open " + str)
 		}
+		*progress = 0.75 * ((float64(i) + 0.5) * percentPerMonth)
+		fmt.Println("Opened " + v)
 		err := json.Unmarshal(plan, &tempCommData)
 		if err != nil {
 			log.Println(err)
 		}
 		fmt.Println(subreddit + " has " + strconv.FormatInt(int64(len(tempCommData)), 10) + " comments in " + v)
 		commentData = append(commentData, tempCommData...)
-		*progress = 0.5 * ((float64(i) + 1.0) * percentPerMonth)
+		*progress = 0.75 * ((float64(i) + 1.0) * percentPerMonth)
 	}
 	fmt.Println(strconv.Itoa(len(commentData)) + " total comments")
-	*progress = 50
+	*progress = 75
 
 	fmt.Println("Tallying word and karma counts...")
 	tallies, karmas := tallyWordOccurrences(commentData)
@@ -58,7 +60,7 @@ func OpenExtractedSubredditDatafile(basedir string, subreddit string, extractedT
 		retSummary.KeywordCommentTallies[v.Word] = percent
 		fmt.Println(str)
 	}
-	*progress = 75
+	*progress = 90
 	fmt.Println("getting karmas")
 
 	for _, v := range tallies[:TotalTallyAndKarmaRecords] {

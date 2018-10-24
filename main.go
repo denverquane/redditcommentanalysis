@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/denverquane/redditcommentanalysis/selection"
 	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
 	"github.com/joho/godotenv"
 	"io"
 	"io/ioutil"
@@ -14,6 +15,16 @@ import (
 	"strconv"
 	"time"
 )
+
+var clients = make(map[*websocket.Conn]bool) // connected clients
+var broadcast = make(chan string)            // broadcast channel
+
+// Configure the upgrader
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
+}
 
 func run(port string) error {
 	handler := makeMuxRouter()
@@ -25,6 +36,8 @@ func run(port string) error {
 		WriteTimeout:   10 * time.Second,
 		MaxHeaderBytes: 1 << 20,
 	}
+
+	go handleMessages()
 
 	if err := s.ListenAndServe(); err != nil {
 		return err
@@ -163,6 +176,7 @@ func makeMuxRouter() http.Handler {
 	muxRouter.HandleFunc("/api/status/{subreddit}", handleViewStatus).Methods("GET")
 	muxRouter.HandleFunc("/api/processSub/{subreddit}", handleProcessSub).Methods("POST")
 	muxRouter.HandleFunc("/api/mockStatus", handleMockStatus).Methods("GET")
+	muxRouter.HandleFunc("/ws", handleConnections)
 	return muxRouter
 }
 
@@ -174,6 +188,47 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "POST \"/api/extractSub/<sub>\" extracts ALL comments from the <sub> subreddit, and saves to a datafile for later Processing\n")
 	io.WriteString(w, "POST \"/api/processSub/<sub>\" processes the previously-extracted data for a subreddit, and saves these processed analytics for later retrieval\n")
 	io.WriteString(w, "GET \"/api/status/<sub>\" displays the extraction and Processing status for a subreddit\n")
+}
+
+func handleConnections(w http.ResponseWriter, r *http.Request) {
+	// Upgrade initial GET request to a websocket
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	// Make sure we close the connection when the function returns
+	defer ws.Close()
+
+	// Register our new client
+	clients[ws] = true
+
+	for {
+		var msg bool
+		// Read in a new message as JSON and map it to a Message object
+		err := ws.ReadJSON(&msg)
+		if err != nil {
+			log.Printf("error: %v", err)
+			delete(clients, ws)
+			break
+		}
+	}
+}
+
+func handleMessages() {
+	for {
+		// Grab the next message from the broadcast channel
+		msg := <-broadcast
+		// Send it out to every client that is currently connected
+		//fmt.Println("Have msg to transmit")
+		for client := range clients {
+			err := client.WriteJSON(msg)
+			if err != nil {
+				log.Printf("error: %v", err)
+				client.Close()
+				delete(clients, client)
+			}
+		}
+	}
 }
 
 func handleMockStatus(w http.ResponseWriter, r *http.Request) {
@@ -247,7 +302,7 @@ func handleGetSubs(w http.ResponseWriter, r *http.Request) {
 func handleExtractSub(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	subreddit := vars["subreddit"]
-
+	writeStdHeaders(w)
 	if val, ok := subredditStatuses[subreddit]; ok {
 		if val.Extracting || len(val.ExtractedMonthCommentCounts) != 0 {
 			io.WriteString(w, "Subreddit "+subreddit+" has been extracted, is Extracting, or is in the queue for extraction!\n")
@@ -268,7 +323,6 @@ func handleExtractSub(w http.ResponseWriter, r *http.Request) {
 		}
 		io.WriteString(w, str)
 	}
-	writeStdHeaders(w)
 }
 
 var extractingProg float64
@@ -286,6 +340,7 @@ func extractQueue() {
 			subredditStatuses[tempSub] = v
 			extractingProg = 0
 		}
+		go monitorProgress(&extractingProg)
 		summary := selection.SaveCriteriaDataToFile("subreddit", tempSub, "2016",
 			os.Getenv("BASE_DATA_DIRECTORY"), selection.BasicSchema, &extractingProg)
 
@@ -296,6 +351,7 @@ func extractQueue() {
 		subredditStatuses[tempSub] = v
 		extractSubQueue = extractSubQueue[1:] //done
 		fmt.Println("COMPLETED")
+		broadcast <- "fetch"
 	}
 }
 
@@ -343,6 +399,8 @@ func processQueue() {
 			processingProg = 0
 			subredditStatuses[tempSub] = v
 		}
+
+		go monitorProgress(&processingProg)
 		sum := selection.OpenExtractedSubredditDatafile(os.Getenv("BASE_DATA_DIRECTORY")+"/"+"2016", tempSub, "Basic", &processingProg)
 
 		v := subredditStatuses[tempSub]
@@ -352,6 +410,20 @@ func processQueue() {
 		subredditStatuses[tempSub] = v
 		processSubQueue = processSubQueue[1:] //done
 		fmt.Println("COMPLETED")
+		broadcast <- "fetch"
+	}
+}
+
+func monitorProgress(prog *float64) {
+	prev := 0.1
+	for {
+		if *prog == 100.0 {
+			break
+		} else if (*prog) != prev {
+			prev = *prog
+			broadcast <- "status"
+		}
+		time.Sleep(time.Second)
 	}
 }
 
