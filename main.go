@@ -148,49 +148,63 @@ func makeMuxRouter() http.Handler {
 	muxRouter.HandleFunc("/api/extractSub/{subreddit}", handleExtractSub).Methods("POST")
 	muxRouter.HandleFunc("/api/status/{subreddit}", handleViewStatus).Methods("GET")
 	muxRouter.HandleFunc("/api/processSub/{subreddit}", handleProcessSub).Methods("POST")
+	muxRouter.HandleFunc("/api/mockStatus", handleMockStatus).Methods("GET")
 	return muxRouter
 }
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
+	writeStdHeaders(w)
 	io.WriteString(w, "Welcome to the Reddit Comment Extractor!\nThese are the endpoints to use:\n")
 	io.WriteString(w, "GET \"/api/status\" displays the overall status of this server and its data Processing\n")
 	io.WriteString(w, "GET \"/api/subs\" lists all subreddits with all comments extracted and/or processed\n")
 	io.WriteString(w, "POST \"/api/extractSub/<sub>\" extracts ALL comments from the <sub> subreddit, and saves to a datafile for later Processing\n")
 	io.WriteString(w, "POST \"/api/processSub/<sub>\" processes the previously-extracted data for a subreddit, and saves these processed analytics for later retrieval\n")
 	io.WriteString(w, "GET \"/api/status/<sub>\" displays the extraction and Processing status for a subreddit\n")
+}
+
+func handleMockStatus(w http.ResponseWriter, r *http.Request) {
 	writeStdHeaders(w)
+	status := ServerStatus{true, 65.67895, []string{"sample", "sample2"},
+		true, 77.5678, []string{"sample3", "sample4"}}
+	bytes, _ := json.Marshal(status)
+	io.WriteString(w, string(bytes))
+}
+
+type ServerStatus struct {
+	Processing      bool
+	ProcessProgress float64
+	ProcessQueue    []string
+
+	Extracting      bool
+	ExtractProgress float64
+	ExtractQueue    []string
 }
 
 func handleStatus(w http.ResponseWriter, r *http.Request) {
-	str := ""
+	status := ServerStatus{}
 	if len(extractSubQueue) > 0 {
-		str += "These subreddits are in the queue and waiting to be extracted: \n"
-		for i, v := range extractSubQueue {
-			if vv, ok := subredditStatuses[v]; ok && vv.Extracting {
-				str += strconv.Itoa(i+1) + ". " + v + " (currently Extracting, " + strconv.FormatFloat(extractingProg, 'f', 2, 64) + "% complete)\n"
-			} else {
-				str += strconv.Itoa(i+1) + ". " + v + "\n"
-			}
-		}
+		status.Extracting = true
+		status.ExtractProgress = extractingProg
+		status.ExtractQueue = extractSubQueue
 	} else {
-		str += "Subreddit extraction queue is empty: waiting for jobs!"
-	}
-	str += "\n\n"
-	if len(processSubQueue) > 0 {
-		str += "These subreddits are in the queue and waiting to be processed: \n"
-		for i, v := range processSubQueue {
-			if vv, ok := subredditStatuses[v]; ok && vv.Processing {
-				str += strconv.Itoa(i+1) + ". " + v + " (currently Processing, " + strconv.FormatFloat(processingProg, 'f', 2, 64) + "% complete)\n"
-			} else {
-				str += strconv.Itoa(i+1) + ". " + v + "\n"
-			}
-		}
-	} else {
-		str += "Subreddit Processing queue is empty: waiting for jobs!"
+		status.Extracting = false
+		status.ExtractProgress = 100
+		status.ExtractQueue = make([]string, 0)
 	}
 
-	io.WriteString(w, str)
+	if len(processSubQueue) > 0 {
+		status.Processing = true
+		status.ProcessProgress = processingProg
+		status.ProcessQueue = processSubQueue
+	} else {
+		status.Processing = false
+		status.ProcessProgress = 100
+		status.ProcessQueue = make([]string, 0)
+	}
+	bytes, _ := json.Marshal(status)
+
 	writeStdHeaders(w)
+	io.WriteString(w, string(bytes))
 }
 
 func handleGetSubs(w http.ResponseWriter, r *http.Request) {
@@ -330,9 +344,10 @@ func handleViewStatus(w http.ResponseWriter, r *http.Request) {
 	subreddit := vars["subreddit"]
 
 	if val, ok := subredditStatuses[subreddit]; !ok {
-		io.WriteString(w, "Subreddit has not been extracted or processed yet!")
+		io.WriteString(w, "{}")
 	} else {
-		io.WriteString(w, val.ToString())
+		data, _ := json.Marshal(val)
+		io.WriteString(w, string(data))
 	}
 	writeStdHeaders(w)
 }
