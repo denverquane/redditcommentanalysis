@@ -257,14 +257,13 @@ func extractQueue() {
 			v.Extracting = true
 			subredditStatuses[tempSub] = v
 		}
-		_ = selection.SaveCriteriaDataToFile("subreddit", tempSub, "2016",
+		summary := selection.SaveCriteriaDataToFile("subreddit", tempSub, "2016",
 			os.Getenv("BASE_DATA_DIRECTORY"), selection.BasicSchema, &extractingProg)
 
 		v := subredditStatuses[tempSub]
 		v.Extracting = false
 
-		//TODO fix
-		//v.ExtractedSummary = str
+		v.ExtractedMonthCommentCounts = summary
 		subredditStatuses[tempSub] = v
 		extractSubQueue = extractSubQueue[1:] //done
 		fmt.Println("COMPLETED")
