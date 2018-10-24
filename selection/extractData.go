@@ -83,7 +83,7 @@ func SaveCriteriaDataToFile(criteria string, value string, year string, basedir 
 			fmt.Println("Opened file " + buffer.String())
 		}
 
-		var totalLines uint64
+		var totalLines int64
 		metafile, fileOpenErr2 := os.Open(buffer.String() + "_meta.txt")
 		if fileOpenErr2 != nil {
 			totalLines = 0
@@ -91,7 +91,7 @@ func SaveCriteriaDataToFile(criteria string, value string, year string, basedir 
 		} else {
 			rdr := bufio.NewReader(metafile)
 			line, _, _ := rdr.ReadLine()
-			totalLines, _ = strconv.ParseUint(string(line), 10, 64)
+			totalLines, _ = strconv.ParseInt(string(line), 10, 64)
 		}
 
 		reader := bufio.NewReaderSize(file, 4096)

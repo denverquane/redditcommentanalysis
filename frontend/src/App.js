@@ -1,26 +1,68 @@
 import React, { Component } from 'react';
 import logo from './logo.svg';
 import './App.css';
-import { Card, Button, Collapse } from '@blueprintjs/core'
+import { Button, Collapse } from '@blueprintjs/core'
+import { Circle } from 'rc-progress'
 import { LineChart, XAxis, YAxis, CartesianGrid, Line, Tooltip} from 'recharts'
 
 let Months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 class App extends Component {
     state = {
-        Subs: Object
+        Subs: Object,
+        Status: Object
     };
+    constructor(){
+        super();
+        this.getStatus();
+    }
 
   render() {
     return (
       <div className="App">
-        <header className="App-header"> 
-          <img src={logo} className="App-logo" alt="logo" />
-          
+        <header className="App-header" style={{display: 'flex', flexDirection: 'row'}}>
+            <div style={{width: '33%', display: 'flex', flexDirection: 'column'}}>
+                Extraction Queue:
+                {this.getLabels(this.state.Status.ExtractQueue)}
+            </div>
+            <div style={{width: '33%', display: 'flex', flexDirection: 'row'}}>
+                {this.state.Status.Extracting ?
+                    (
+                        <div style={{width: '20%', height: '20%'}}>
+                            <Circle strokeWidth="10" percent={this.state.Status.ExtractProgress}/>
+                            "{this.state.Status.ExtractQueue[0]}" {this.state.Status.ExtractProgress.toFixed(3)}% Extracted
+                        </div>
+                    ) : <div style={{width: '20%', height: '20%'}}>
+                        <Circle strokeWidth="10" percent={this.state.Status.ExtractProgress}/>
+                        Nothing to Extract!
+                    </div>
+                }
+                <img style={{width: '60%'}} src={logo} className="App-logo" alt="logo" />
+                {this.state.Status.Processing ?
+                    (
+                        <div style={{width: '20%', height: '20%'}}>
+                            <Circle strokeWidth="10" percent={this.state.Status.ProcessProgress}/>
+                            "{this.state.Status.ProcessQueue[0]}" {this.state.Status.ProcessProgress.toFixed(3)}% Processed
+                        </div>
+                    ) : <div style={{width: '20%', height: '20%'}}>
+                        <Circle strokeWidth="10" percent={this.state.Status.ProcessProgress}/>
+                        Nothing to Process!
+                    </div>
+                }
+            </div>
+            <div style={{width: '33%', display: 'flex', flexDirection: 'column'}}>
+                Processing Queue:
+                {this.getLabels(this.state.Status.ProcessQueue)}
+            </div>
         </header>
+
+          <button onClick={() => this.getStatus()}>
+              Refresh Status
+          </button>
+
         <button onClick={() => this.getSubs()}>
             Fetch Subs
-            </button>
+        </button>
             {this.displaySubs()}
               {/* {this.state.Subs.EarthPorn ? (this.state.Subs.EarthPorn.Processing ? <p>'True'</p> : <p>'False'</p>) : ''} */}
       </div>
@@ -50,7 +92,7 @@ class App extends Component {
   }
 
   getSubs() {
-      fetch('http://dquane.tplinkdns.com:5000/api/subs')
+      fetch('http://localhost:5000/api/subs')
           .then(results => {
               return results.json();
           }).then(data => {
@@ -61,6 +103,36 @@ class App extends Component {
           }
         
       });
+  }
+
+  getStatus(){
+      fetch('http://localhost:5000/api/status')
+          .then(results => {
+              return results.json();
+          }).then(data => {
+
+          if (JSON.stringify(this.state.Status) !== JSON.stringify(data)) {
+              console.log('Updated' + data.ExtractProgress);
+              this.setState({ ...this.state, Status: data });
+          }
+
+      });
+  }
+
+  getLabels(queue){
+      let arr = [];
+      if (!queue || queue.length === 0) {
+          return <div>Empty Queue</div>
+      }
+      for (let i in queue) {
+          if (i === "0") {
+              arr.push(<div key={i}>{i}. {queue[i]}</div>)
+          } else {
+              arr.push(<div key={i}>{i}. {queue[i]}</div>)
+          }
+
+      }
+      return arr
   }
 }
 
