@@ -143,28 +143,42 @@ func (status subredditStatus) ToString() string {
 }
 
 func main() {
-	fmt.Println("Started!")
 	err := godotenv.Load()
+
+	// TODO if the env can't be loaded, check the REDDIT_DATA_DIRECTORY env var instead
+
+	// TODO if the REDDIT_DATA_DIRECTORY doesn't work, assume in a docker container, and use /data
+
+	// TODO if /data doesn't work (or have the right format?) exit the program with error
 
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
 
+	yearsAndMonthsAvailable := selection.ListYearsAndMonthsForExtractionInDir("./data")
+	for i, v := range yearsAndMonthsAvailable {
+		fmt.Print(i + " has [ ")
+		for _, vv := range v {
+			fmt.Print(vv + " ")
+		}
+		fmt.Println("] to extract ")
+	}
+
 	checkForExtractedSubs("2016", "Basic")
 
-	if os.Getenv("RUN_SERVER") == "true" {
-		port := os.Getenv("SERVER_PORT")
-		log.Fatal(run(port))
-	} else {
-		year := "2016"
-		subreddit := "funny"
-		schema := "Basic"
-		//var prog float64
-		//_ = selection.SaveCriteriaDataToFile("subreddit", "funny", "2016", os.Getenv("BASE_DATA_DIRECTORY"), selection.BasicSchema, &prog)
-		selection.OpenExtractedSubredditDatafile(os.Getenv("BASE_DATA_DIRECTORY")+"/"+year, subreddit, schema, &processingProg)
-		//scanDirForExtractedSubData(os.Getenv("BASE_DATA_DIRECTORY") + "/2016/Jan", "Basic")
-
-	}
+	//if os.Getenv("RUN_SERVER") == "true" {
+	//	port := os.Getenv("SERVER_PORT")
+	//	log.Fatal(run(port))
+	//} else {
+	//	year := "2016"
+	//	subreddit := "funny"
+	//	schema := "Basic"
+	//	//var prog float64
+	//	//_ = selection.SaveCriteriaDataToFile("subreddit", "funny", "2016", os.Getenv("BASE_DATA_DIRECTORY"), selection.BasicSchema, &prog)
+	//	selection.OpenExtractedSubredditDatafile(os.Getenv("BASE_DATA_DIRECTORY")+"/"+year, subreddit, schema, &processingProg)
+	//	//scanDirForExtractedSubData(os.Getenv("BASE_DATA_DIRECTORY") + "/2016/Jan", "Basic")
+	//
+	//}
 }
 
 func makeMuxRouter() http.Handler {

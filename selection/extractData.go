@@ -34,7 +34,11 @@ func getCommentDataFromLine(line []byte, keyTypes map[string]string) map[string]
 
 	for key, v := range keyTypes {
 		if v == "str" {
-			result[key] = strings.ToLower(fastjson.GetString(line, key))
+			if key == "body" {
+				result[key] = filterStopWordsFromString(strings.ToLower(fastjson.GetString(line, key)))
+			} else {
+				result[key] = strings.ToLower(fastjson.GetString(line, key))
+			}
 		} else if v == "int" {
 			result[key] = strconv.Itoa(fastjson.GetInt(line, key))
 		} else {
@@ -137,36 +141,4 @@ func SaveCriteriaDataToFile(criteria string, value string, year string, basedir 
 		*progress = percentPerMonth * float64(mIndex+1.0)
 	}
 	return summary
-}
-
-func monthToIntString(month string) string {
-	switch month {
-	case "Jan":
-		return "-01"
-	case "Feb":
-		return "-02"
-	case "Mar":
-		return "-03"
-	case "Apr":
-		return "-04"
-	case "May":
-		return "-05"
-	case "Jun":
-		return "-06"
-	case "Jul":
-		return "-07"
-	case "Aug":
-		return "-08"
-	case "Sep":
-		return "-09"
-	case "Oct":
-		return "-10"
-	case "Nov":
-		return "-11"
-	case "Dec":
-		return "-12"
-	default:
-		log.Println("Invalid month supplied; defaulting to january")
-		return "-01"
-	}
 }
