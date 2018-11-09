@@ -143,6 +143,7 @@ func (status subredditStatus) ToString() string {
 }
 
 func main() {
+	fmt.Println("Started!")
 	err := godotenv.Load()
 
 	if err != nil {
