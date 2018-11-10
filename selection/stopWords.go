@@ -13,6 +13,7 @@ func IsStopWord(word string) bool {
 	return contains(stopWords, word) || contains(otherWords, word)
 }
 
+//TODO this needs refinement
 func filterStopWordsFromString(line string) string {
 	fields := strings.Fields(line)
 	var buffer bytes.Buffer

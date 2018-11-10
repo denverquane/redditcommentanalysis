@@ -113,6 +113,7 @@ func checkForExtractedSubs(year string, schema string) {
 	}
 }
 
+//TODO move this out of main!
 var extractSubQueue = make([]string, 0)
 var processSubQueue = make([]string, 0)
 var subredditStatuses = make(map[string]subredditStatus)
@@ -143,6 +144,10 @@ func (status subredditStatus) ToString() string {
 }
 
 func main() {
+	var DataDirectory string
+	var RunServer string
+	var ServerPort string
+
 	err := godotenv.Load()
 
 	// TODO if the env can't be loaded, check the REDDIT_DATA_DIRECTORY env var instead
@@ -153,9 +158,13 @@ func main() {
 
 	if err != nil {
 		log.Fatal("Error loading .env file")
+	} else {
+		DataDirectory = os.Getenv("BASE_DATA_DIRECTORY")
+		RunServer = os.Getenv("RUN_SERVER")
+		ServerPort = os.Getenv("SERVER_PORT")
 	}
 
-	yearsAndMonthsAvailable := selection.ListYearsAndMonthsForExtractionInDir("./data")
+	yearsAndMonthsAvailable := selection.ListYearsAndMonthsForExtractionInDir(DataDirectory)
 	for i, v := range yearsAndMonthsAvailable {
 		fmt.Print(i + " has [ ")
 		for _, vv := range v {
@@ -164,21 +173,20 @@ func main() {
 		fmt.Println("] to extract ")
 	}
 
-	checkForExtractedSubs("2016", "Basic")
+	//checkForExtractedSubs("2016", "Basic")
 
-	//if os.Getenv("RUN_SERVER") == "true" {
-	//	port := os.Getenv("SERVER_PORT")
-	//	log.Fatal(run(port))
-	//} else {
-	//	year := "2016"
-	//	subreddit := "funny"
-	//	schema := "Basic"
-	//	//var prog float64
-	//	//_ = selection.SaveCriteriaDataToFile("subreddit", "funny", "2016", os.Getenv("BASE_DATA_DIRECTORY"), selection.BasicSchema, &prog)
-	//	selection.OpenExtractedSubredditDatafile(os.Getenv("BASE_DATA_DIRECTORY")+"/"+year, subreddit, schema, &processingProg)
-	//	//scanDirForExtractedSubData(os.Getenv("BASE_DATA_DIRECTORY") + "/2016/Jan", "Basic")
-	//
-	//}
+	if RunServer == "true" {
+		log.Fatal(run(ServerPort))
+	} else {
+		year := "2016"
+		subreddit := "funny"
+		schema := "Basic"
+		//var prog float64
+		//_ = selection.SaveCriteriaDataToFile("subreddit", "funny", "2016", os.Getenv("BASE_DATA_DIRECTORY"), selection.BasicSchema, &prog)
+		selection.OpenExtractedSubredditDatafile(DataDirectory+"/"+year, subreddit, schema, &processingProg)
+		//scanDirForExtractedSubData(os.Getenv("BASE_DATA_DIRECTORY") + "/2016/Jan", "Basic")
+
+	}
 }
 
 func makeMuxRouter() http.Handler {
@@ -356,13 +364,18 @@ func extractQueue() {
 			extractingProg = 0
 		}
 		go monitorProgress(&extractingProg)
-		summary := selection.SaveCriteriaDataToFile("subreddit", tempSub, "2016",
+
+		//TODO ensure that the month/year for extraction is present in the list of uncompressed data entries
+		summary := selection.ExtractCriteriaDataToFile("subreddit", tempSub, "2012", "Jan",
 			os.Getenv("BASE_DATA_DIRECTORY"), selection.BasicSchema, &extractingProg)
 
 		v := subredditStatuses[tempSub]
 		v.Extracting = false
 		v.Extracted = true
-		v.ExtractedMonthCommentCounts = summary
+		if v.ExtractedMonthCommentCounts == nil {
+			v.ExtractedMonthCommentCounts = make(map[string]int64, 1)
+		}
+		v.ExtractedMonthCommentCounts["Jan"] = summary
 		subredditStatuses[tempSub] = v
 		extractSubQueue = extractSubQueue[1:] //done
 		fmt.Println("COMPLETED")
