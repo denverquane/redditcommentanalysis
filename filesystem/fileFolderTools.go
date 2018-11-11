@@ -35,3 +35,15 @@ func DoesFileExist(path string) bool {
 		return true
 	}
 }
+
+func CreateSubdirectoryStructure(basedir, month, year string) {
+	if !DoesFolderExist(basedir + "/Extracted") {
+		CreateFolder(basedir + "/Extracted")
+	}
+	if !DoesFolderExist(basedir + "/Extracted/" + year) {
+		CreateFolder(basedir + "/Extracted/" + year)
+	}
+	if !DoesFolderExist(basedir + "/Extracted/" + year + "/" + month) {
+		CreateFolder(basedir + "/Extracted/" + year + "/" + month)
+	}
+}

@@ -1,6 +1,8 @@
 package selection
 
 import (
+	"encoding/json"
+	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -25,7 +27,7 @@ func ListYearsAndMonthsForExtractionInDir(dir string) map[string][]string {
 	for _, file := range files {
 		if !file.IsDir() {
 			if strings.HasPrefix(file.Name(), "RC_") && !strings.Contains(file.Name(), ".bz2") &&
-				!strings.Contains(file.Name(), "meta") && !strings.Contains(file.Name(), ".txt") {
+				!strings.Contains(file.Name(), "count") && !strings.Contains(file.Name(), ".txt") {
 
 				yrMonth := strings.Replace(file.Name(), "RC_", "", -1)
 				fields := strings.Split(yrMonth, "-")
@@ -37,6 +39,23 @@ func ListYearsAndMonthsForExtractionInDir(dir string) map[string][]string {
 		}
 	}
 	return yearsAndMonths
+}
+
+func readInCommentCountMetadata(rawDataFilePath string) int64 {
+	linecountFilePath := rawDataFilePath + "_count"
+	if _, err := os.Stat(linecountFilePath); !os.IsNotExist(err) {
+		var count int64
+		plan, fileOpenErr := ioutil.ReadFile(linecountFilePath)
+		if fileOpenErr != nil {
+			log.Fatal("failed to open " + linecountFilePath)
+		}
+		err := json.Unmarshal(plan, &count)
+		if err != nil {
+			log.Fatal(err)
+		}
+		return count
+	}
+	return 0
 }
 
 func monthToIntString(month string) string {

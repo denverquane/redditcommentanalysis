@@ -8,7 +8,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/joho/godotenv"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -26,123 +25,6 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func run(port string) error {
-	handler := makeMuxRouter()
-
-	s := &http.Server{
-		Addr:           ":" + port,
-		Handler:        handler,
-		ReadTimeout:    10 * time.Second,
-		WriteTimeout:   10 * time.Second,
-		MaxHeaderBytes: 1 << 20,
-	}
-
-	go handleMessages()
-
-	if err := s.ListenAndServe(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func checkForExtractedSubs(year string, schema string) {
-	dir := os.Getenv("BASE_DATA_DIRECTORY") + "/" + year + "/"
-
-	for _, month := range selection.AllMonths {
-		arr := selection.ScanDirForExtractedSubData(dir+month, schema) //scan the current month folder for all subs
-
-		for _, sub := range arr {
-			fmt.Println("Checking " + sub)
-			var commentCount int64
-			str := os.Getenv("BASE_DATA_DIRECTORY") + "/" + year + "/" + month + "/" + "subreddit_" + sub + "_" + schema + "_count"
-			plan, fileOpenErr := ioutil.ReadFile(str)
-			if fileOpenErr != nil {
-				log.Println("Failed to open " + str + ", now opening datafile and writing total comment count to file")
-				var comments []map[string]string
-				str := os.Getenv("BASE_DATA_DIRECTORY") + "/" + year + "/" + month + "/" + "subreddit_" + sub + "_" + schema
-				plan, fileOpenErr := ioutil.ReadFile(str)
-				if fileOpenErr != nil {
-					log.Fatal("failed to open " + str)
-				}
-				err := json.Unmarshal(plan, &comments)
-				if err != nil {
-					log.Println(err)
-				}
-				file, err2 := os.Create(os.Getenv("BASE_DATA_DIRECTORY") + "/" + year + "/" + month + "/" + "subreddit_" + sub + "_" + schema + "_count")
-				if err != nil {
-					log.Println(err2)
-				}
-				length := strconv.FormatInt(int64(len(comments)), 10)
-				file.Write([]byte(length))
-				fmt.Println("Wrote " + length + " to file for " + sub + " in " + month)
-
-				commentCount = int64(len(comments))
-				file.Close()
-			} else {
-				err := json.Unmarshal(plan, &commentCount)
-				if err != nil {
-					log.Fatal("Failed to unmarshal extracted data for " + sub)
-				} else {
-					fmt.Println("Extracted " + strconv.FormatInt(commentCount, 10))
-				}
-			}
-
-			if val, ok := subredditStatuses[sub]; ok {
-				val.ExtractedMonthCommentCounts[month] = commentCount
-			} else {
-				status := subredditStatus{Extracting: false, ExtractedMonthCommentCounts: make(map[string]int64, 1), Processing: false, ProcessedSummary: selection.ProcessedSubredditStats{}}
-				status.ExtractedMonthCommentCounts[month] = commentCount
-				subredditStatuses[sub] = status
-			}
-		}
-	}
-	for sub, val := range subredditStatuses {
-		all := true
-		for _, mon := range selection.AllMonths {
-			if _, ok := val.ExtractedMonthCommentCounts[mon]; !ok {
-				all = false
-			}
-		}
-		if all {
-			fmt.Println("Found ALL entries for " + sub)
-			val.Extracted = true
-			subredditStatuses[sub] = val
-		} else {
-			log.Println("Missing entries for " + sub)
-		}
-	}
-}
-
-//TODO move this out of main!
-var extractSubQueue = make([]string, 0)
-var processSubQueue = make([]string, 0)
-var subredditStatuses = make(map[string]subredditStatus)
-
-type subredditStatus struct {
-	Extracting                  bool
-	Extracted                   bool
-	ExtractedMonthCommentCounts map[string]int64
-	Processing                  bool
-	Processed                   bool
-	ProcessedSummary            selection.ProcessedSubredditStats
-}
-
-func (status subredditStatus) ToString() string {
-	str := "Extracting: " + strconv.FormatBool(status.Extracting) + "\n"
-
-	if !status.Extracting && len(status.ExtractedMonthCommentCounts) != 0 {
-		str += "Extracted summary: " + "\n"
-	}
-
-	str += "Processing: " + strconv.FormatBool(status.Processing) + "\n"
-
-	//if !status.Processing && status.ProcessedSummary != "" {
-	//	str += "Processed summary: " + status.ProcessedSummary + "\n"
-	//}
-
-	return str
-}
-
 func main() {
 	var DataDirectory string
 	var RunServer string
@@ -155,6 +37,9 @@ func main() {
 	// TODO if the REDDIT_DATA_DIRECTORY doesn't work, assume in a docker container, and use /data
 
 	// TODO if /data doesn't work (or have the right format?) exit the program with error
+
+	resp := selection.GetSentimentForString("http://192.168.1.192:8888", "happy happy happy evil")
+	fmt.Println(resp)
 
 	if err != nil {
 		log.Fatal("Error loading .env file")
@@ -187,6 +72,123 @@ func main() {
 		//scanDirForExtractedSubData(os.Getenv("BASE_DATA_DIRECTORY") + "/2016/Jan", "Basic")
 
 	}
+}
+
+func run(port string) error {
+	handler := makeMuxRouter()
+
+	s := &http.Server{
+		Addr:           ":" + port,
+		Handler:        handler,
+		ReadTimeout:    10 * time.Second,
+		WriteTimeout:   10 * time.Second,
+		MaxHeaderBytes: 1 << 20,
+	}
+
+	go handleMessages()
+
+	if err := s.ListenAndServe(); err != nil {
+		return err
+	}
+	return nil
+}
+
+//func checkForExtractedSubs(year string, schema string) {
+//	dir := os.Getenv("BASE_DATA_DIRECTORY") + "/" + year + "/"
+//
+//	for _, month := range selection.AllMonths {
+//		arr := selection.ScanDirForExtractedSubData(dir+month, schema) //scan the current month folder for all subs
+//
+//		for _, sub := range arr {
+//			fmt.Println("Checking " + sub)
+//			var commentCount int64
+//			str := os.Getenv("BASE_DATA_DIRECTORY") + "/" + year + "/" + month + "/" + "subreddit_" + sub + "_" + schema + "_count"
+//			plan, fileOpenErr := ioutil.ReadFile(str)
+//			if fileOpenErr != nil {
+//				log.Println("Failed to open " + str + ", now opening datafile and writing total comment count to file")
+//				var comments []map[string]string
+//				str := os.Getenv("BASE_DATA_DIRECTORY") + "/" + year + "/" + month + "/" + "subreddit_" + sub + "_" + schema
+//				plan, fileOpenErr := ioutil.ReadFile(str)
+//				if fileOpenErr != nil {
+//					log.Fatal("failed to open " + str)
+//				}
+//				err := json.Unmarshal(plan, &comments)
+//				if err != nil {
+//					log.Println(err)
+//				}
+//				file, err2 := os.Create(os.Getenv("BASE_DATA_DIRECTORY") + "/" + year + "/" + month + "/" + "subreddit_" + sub + "_" + schema + "_count")
+//				if err != nil {
+//					log.Println(err2)
+//				}
+//				length := strconv.FormatInt(int64(len(comments)), 10)
+//				file.Write([]byte(length))
+//				fmt.Println("Wrote " + length + " to file for " + sub + " in " + month)
+//
+//				commentCount = int64(len(comments))
+//				file.Close()
+//			} else {
+//				err := json.Unmarshal(plan, &commentCount)
+//				if err != nil {
+//					log.Fatal("Failed to unmarshal extracted data for " + sub)
+//				} else {
+//					fmt.Println("Extracted " + strconv.FormatInt(commentCount, 10))
+//				}
+//			}
+//
+//			if val, ok := subredditStatuses[sub]; ok {
+//				val.ExtractedMonthCommentCounts[month] = commentCount
+//			} else {
+//				status := subredditStatus{Extracting: false, ExtractedMonthCommentCounts: make(map[string]int64, 1), Processing: false, ProcessedSummary: selection.ProcessedSubredditStats{}}
+//				status.ExtractedMonthCommentCounts[month] = commentCount
+//				subredditStatuses[sub] = status
+//			}
+//		}
+//	}
+//	for sub, val := range subredditStatuses {
+//		all := true
+//		for _, mon := range selection.AllMonths {
+//			if _, ok := val.ExtractedMonthCommentCounts[mon]; !ok {
+//				all = false
+//			}
+//		}
+//		if all {
+//			fmt.Println("Found ALL entries for " + sub)
+//			val.Extracted = true
+//			subredditStatuses[sub] = val
+//		} else {
+//			log.Println("Missing entries for " + sub)
+//		}
+//	}
+//}
+
+//TODO move this out of main!
+var extractSubQueue = make([]string, 0)
+var processSubQueue = make([]string, 0)
+var subredditStatuses = make(map[string]subredditStatus)
+
+type subredditStatus struct {
+	Extracting                  bool
+	Extracted                   bool
+	ExtractedMonthCommentCounts map[string]int64
+	Processing                  bool
+	Processed                   bool
+	ProcessedSummary            selection.ProcessedSubredditStats
+}
+
+func (status subredditStatus) ToString() string {
+	str := "Extracting: " + strconv.FormatBool(status.Extracting) + "\n"
+
+	if !status.Extracting && len(status.ExtractedMonthCommentCounts) != 0 {
+		str += "Extracted summary: " + "\n"
+	}
+
+	str += "Processing: " + strconv.FormatBool(status.Processing) + "\n"
+
+	//if !status.Processing && status.ProcessedSummary != "" {
+	//	str += "Processed summary: " + status.ProcessedSummary + "\n"
+	//}
+
+	return str
 }
 
 func makeMuxRouter() http.Handler {
