@@ -37,10 +37,11 @@ var extractSubQueue = make([]SubredditJob, 0)
 var processSubQueue = make([]SubredditJob, 0)
 var subredditStatuses = make(map[string]subredditStatus)
 
+var DataDirectory string
+var RunServer string
+var ServerPort string
+
 func main() {
-	var DataDirectory string
-	var RunServer string
-	var ServerPort string
 
 	err := godotenv.Load()
 
@@ -108,9 +109,8 @@ func run(port string) error {
 }
 
 func checkForExtractedSubs(year string, schema string) {
-	baseDir := os.Getenv("BASE_DATA_DIRECTORY")
 
-	yearDirectory := baseDir + "/Extracted/" + year + "/"
+	yearDirectory := DataDirectory + "/Extracted/" + year + "/"
 
 	for _, month := range selection.AllMonths {
 		arr := selection.ScanDirForExtractedSubData(yearDirectory+month, schema) //scan the current Month folder for all subs
@@ -216,7 +216,7 @@ func makeMuxRouter() http.Handler {
 	muxRouter.HandleFunc("/api/subs", handleGetSubs).Methods("GET")
 	muxRouter.HandleFunc("/api/extractSub/{Subreddit}/{Month}/{Year}", handleExtractSub).Methods("POST")
 	muxRouter.HandleFunc("/api/status/{Subreddit}", handleViewStatus).Methods("GET")
-	muxRouter.HandleFunc("/api/processSub/{Subreddit}", handleProcessSub).Methods("POST")
+	muxRouter.HandleFunc("/api/processSub/{Subreddit}/{Month}/{Year}", handleProcessSub).Methods("POST")
 	muxRouter.HandleFunc("/api/mockStatus", handleMockStatus).Methods("GET")
 	muxRouter.HandleFunc("/ws", handleConnections)
 	return muxRouter
@@ -390,7 +390,7 @@ func extractQueue() {
 
 		//TODO ensure that the Month/Year for extraction is present in the list of uncompressed data entries
 		summary := selection.ExtractCriteriaDataToFile("Subreddit", tempSub.Subreddit, tempSub.Year, tempSub.Month,
-			os.Getenv("BASE_DATA_DIRECTORY"), selection.BasicSchema, &extractingProg)
+			DataDirectory, selection.BasicSchema, &extractingProg)
 
 		v := subredditStatuses[tempSub.Subreddit]
 		v.Extracting = false
@@ -423,7 +423,7 @@ func handleProcessSub(w http.ResponseWriter, r *http.Request) {
 			io.WriteString(w, "Subreddit \""+subreddit+"\" has already been processed:\n")
 		} else if val.Extracting {
 			io.WriteString(w, "Subreddit \""+subreddit+"\" is still being extracted")
-		} else if val.Extracted {
+		} else {
 			job := SubredditJob{Month: month, Year: year, Subreddit: subreddit}
 			processSubQueue = append(processSubQueue, job)
 
@@ -437,8 +437,6 @@ func handleProcessSub(w http.ResponseWriter, r *http.Request) {
 				go processQueue() //this is the main goroutine that will process all the future jobs
 			}
 			io.WriteString(w, str+"}")
-		} else {
-			io.WriteString(w, "Subreddit has not been extracted or processed yet, please hit the endpoint \"/extractSub/"+subreddit+"\" to extract the Subreddit data first")
 		}
 	} else {
 		io.WriteString(w, "Subreddit has not been extracted or processed yet, please hit the endpoint \"/extractSub/"+subreddit+"\" to extract the Subreddit data first")
@@ -458,7 +456,7 @@ func processQueue() {
 		}
 
 		go monitorProgress(&processingProg)
-		sum := selection.OpenExtractedSubredditDatafile(os.Getenv("BASE_DATA_DIRECTORY"), tempSub.Month, tempSub.Year, tempSub.Subreddit, "Basic", &processingProg)
+		sum := selection.OpenExtractedSubredditDatafile(DataDirectory, tempSub.Month, tempSub.Year, tempSub.Subreddit, "Basic", &processingProg)
 
 		v := subredditStatuses[tempSub.Subreddit]
 		v.Processing = false

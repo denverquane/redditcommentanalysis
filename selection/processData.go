@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"github.com/valyala/fastjson"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -31,13 +32,20 @@ func OpenExtractedSubredditDatafile(basedir, month, year, subreddit, extractedTy
 	retSummary := ProcessedSubredditStats{make(map[string]float64, 0), make(map[string]float64)}
 	var commentData []map[string]string
 	str := basedir + "/Extracted/" + year + "/" + month + "/subreddit_" + subreddit + "_" + extractedType
+	fmt.Println("Opening " + str)
 
 	extractedDataFile, fileOpenErr := os.Open(str)
 	if fileOpenErr != nil {
 		log.Fatal("failed to open " + str)
 	}
+	totalLines, err := LineCounter(extractedDataFile)
+	if err != nil {
+		log.Println(err)
+	}
+	extractedDataFile.Seek(0, 0)
 	extractedDataFileReader := bufio.NewReaderSize(extractedDataFile, 4096)
 
+	lines := 0
 	for {
 		var tempComment map[string]string
 		line := recurseBuildCompleteLine(extractedDataFileReader)
@@ -50,24 +58,12 @@ func OpenExtractedSubredditDatafile(basedir, month, year, subreddit, extractedTy
 			}
 			commentData = append(commentData, tempComment)
 		}
+		lines++
+		*progress = 50.0 * (float64(lines) / float64(totalLines))
 	}
 
-	//	if fileOpenErr != nil {
-	//		log.Fatal("failed to open " + str)
-	//	}
-	//	*progress = 0.75 * ((float64(i) + 0.5) * percentPerMonth)
-	//	fmt.Println("Opened " + v)
-	//	err := json.Unmarshal(plan, &tempCommData)
-	//	if err != nil {
-	//		log.Println(err)
-	//	}
-	//	fmt.Println(subreddit + " has " + strconv.FormatInt(int64(len(tempCommData)), 10) + " comments in " + v)
-	//	commentData = append(commentData, tempCommData...)
-	//	*progress = 0.75 * ((float64(i) + 1.0) * percentPerMonth)
-	//}
-
 	fmt.Println(strconv.Itoa(len(commentData)) + " total comments")
-	*progress = 75
+	*progress = 60
 
 	fmt.Println("Tallying word and karma counts...")
 	tallies, karmas := tallyWordOccurrences(commentData)
@@ -78,7 +74,7 @@ func OpenExtractedSubredditDatafile(basedir, month, year, subreddit, extractedTy
 		retSummary.KeywordCommentTallies[v.Word] = percent
 		fmt.Println(str)
 	}
-	*progress = 90
+	*progress = 70
 	fmt.Println("getting karmas")
 
 	for _, v := range tallies[:TotalTallyAndKarmaRecords] {
@@ -90,6 +86,21 @@ func OpenExtractedSubredditDatafile(basedir, month, year, subreddit, extractedTy
 			}
 		}
 	}
+	*progress = 80
+	fmt.Println("getting sentiments")
+	var sentTotal = 0.0
+	for _, v := range commentData {
+		str := v["body"]
+		if str == "" {
+			continue
+		}
+		str = GetSentimentForString("http://192.168.1.192:8888", str)
+		f64 := fastjson.GetFloat64([]byte(str), "comparative")
+		sentTotal += f64
+	}
+	avgSent := sentTotal / float64(len(commentData))
+	fmt.Println("Subreddit " + subreddit + " avg sentiment: " + strconv.FormatFloat(avgSent, 'f', 3, 64))
+
 	*progress = 100
 	return retSummary
 }
