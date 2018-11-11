@@ -82,7 +82,7 @@ class App extends Component {
                     (
                         <div style={{width: '20%', height: '20%'}}>
                             <Circle strokeWidth="10" percent={this.state.Status.ExtractProgress}/>
-                            "{this.state.Status.ExtractQueue[0]}" {this.state.Status.ExtractProgress.toFixed(3)}% Extracted
+                            "{this.state.Status.ExtractQueue[0]["Subreddit"]}" {this.state.Status.ExtractProgress.toFixed(3)}% Extracted
                         </div>
                     ) : <div style={{width: '20%', height: '20%'}}>
                         <Circle strokeWidth="10" percent={this.state.Status.ExtractProgress}/>
@@ -95,7 +95,7 @@ class App extends Component {
                     (
                         <div style={{width: '20%', height: '20%'}}>
                             <Circle strokeWidth="10" percent={this.state.Status.ProcessProgress}/>
-                            "{this.state.Status.ProcessQueue[0]}" {this.state.Status.ProcessProgress.toFixed(3)}% Processed
+                            "{this.state.Status.ProcessQueue[0]["Subreddit"]}" {this.state.Status.ProcessProgress.toFixed(3)}% Processed
                         </div>
                     ) : <div style={{width: '20%', height: '20%'}}>
                         <Circle strokeWidth="10" percent={this.state.Status.ProcessProgress}/>
@@ -125,36 +125,49 @@ class App extends Component {
   displaySubs() {
     let arr = [];
     for (let key in this.state.Subs) {
-        let months = [];
+        let years = [];
         let totalComments = 0;
         let substatus = this.state.Subs[key];
-        if (!substatus.ExtractedMonthCommentCounts || substatus.ExtractedMonthCommentCounts.length < 12){
-            continue
-        }
-        let all = true;
-        for (let mo in Months) {
-            if (!substatus.ExtractedMonthCommentCounts[Months[mo]]) {
-                all = false
-                break
-            }
-            months.push({key: Months[mo], comments: substatus.ExtractedMonthCommentCounts[Months[mo]]});
-            totalComments += substatus.ExtractedMonthCommentCounts[Months[mo]];
-        }
-        if (!all) {
-            continue
-        }
-        let words = [];
-        for (let wo in substatus.ProcessedSummary.KeywordCommentTallies) {
-            words.push({key: wo, 'Percent of Comments Containing': substatus.ProcessedSummary.KeywordCommentTallies[wo],
-                'Karma per Comment Containing': substatus.ProcessedSummary.KeywordCommentKarmas[wo]})
-        }
-      arr.push(
 
+        for (let yr in substatus["ExtractedMonthCommentCounts"]) {
+            let months = [];
+            for (let month in substatus["ExtractedMonthCommentCounts"][yr]) {
+                months.push(<div><h3>{month}</h3><p>{substatus["ExtractedMonthCommentCounts"][yr][month]}</p></div>)
+            }
+            years.push(
+                <div>
+                    <h2>{yr}</h2>
+                    {months}
+                </div>
+            )
+        }
+        // if (!substatus.ExtractedMonthCommentCounts || substatus.ExtractedMonthCommentCounts.length < 12){
+        //     continue
+        // }
+        // // let all = true;
+        // for (let mo in Months) {
+        //     // if (!substatus.ExtractedMonthCommentCounts[Months[mo]]) {
+        //     //     all = false
+        //     //     break
+        //     // }
+        //     months.push({key: Months[mo], comments: substatus.ExtractedMonthCommentCounts[Months[mo]]});
+        //     totalComments += substatus.ExtractedMonthCommentCounts[Months[mo]];
+        // }
+        // // if (!all) {
+        // //     continue
+        // // }
+        // let words = [];
+        // for (let wo in substatus.ProcessedSummary.KeywordCommentTallies) {
+        //     words.push({key: wo, 'Percent of Comments Containing': substatus.ProcessedSummary.KeywordCommentTallies[wo],
+        //         'Karma per Comment Containing': substatus.ProcessedSummary.KeywordCommentKarmas[wo]})
+        // }
+      arr.push(
           <Card key={key} style={{display: 'flex', backgroundColor: '#ECEBEB', flexDirection: 'column', marginBottom: '1%'}} elevation={Elevation.TWO} interactive={true}>
               <h1>{key}</h1>
                   ({totalComments.toLocaleString()} total comments)
-                  <CollapseExample text={{label: 'Monthly Data', type: 'months', months: months}}/>
-              {this.state.Subs[key].Processed ? <div><CollapseExample text={{label: 'Keyword Data', type: 'karma', words: words}}/></div> : this.processButton(key)}
+              {years}
+                  {/*<CollapseExample text={{label: 'Monthly Data', type: 'months', months: months}}/>*/}
+              {/*{this.state.Subs[key].Processed ? <div><CollapseExample text={{label: 'Keyword Data', type: 'karma', words: words}}/></div> : this.processButton(key)}*/}
           </Card>);
     }
       arr.sort(function(a,b){
@@ -201,7 +214,7 @@ class App extends Component {
               arr.push(
                   <div>
                     <div style={{width: '33%'}}/>
-                    <Tag key={i} intent={Intent.SUCCESS} style={{width: '33%', marginBottom: '1%'}}>{i}. {queue[i]} </Tag>
+                    <Tag key={i} intent={Intent.SUCCESS} style={{width: '33%', marginBottom: '1%'}}>{i}. {queue[i]["Subreddit"]} </Tag>
                     <div style={{width: '33%'}}/>
                   </div>
               )
@@ -209,7 +222,7 @@ class App extends Component {
               arr.push(
                   <div>
                       <div style={{width: '33%'}}/>
-                      <Tag key={i} intent={Intent.NONE} style={{width: '33%'}}>{i}. {queue[i]}</Tag>
+                      <Tag key={i} intent={Intent.NONE} style={{width: '33%'}}>{i}. {queue[i]["Subreddit"]}</Tag>
                       <div style={{width: '33%'}}/>
                   </div>
               )
@@ -273,14 +286,15 @@ export class CollapseExample extends React.Component {
                 </Button>
                 {this.state.text.text.type === 'months' ?
                     <Collapse isOpen={this.state.isOpen}>
-                        <LineChart width={width * 0.9} height={500} data={this.state.text.text.months} margin={{left: width*0.05}}>
-                            <XAxis dataKey="key"/>
-                            <YAxis />
-                            <CartesianGrid stroke="#eee" strokeDasharray="5 5"/>
-                            <Line dataKey="comments" fill="blue" />\
-                            <Tooltip/>
-                            <Legend/>
-                        </LineChart>
+                        {/*<LineChart width={width * 0.9} height={500} data={this.state.text.text.months} margin={{left: width*0.05}}>*/}
+                            {/*<XAxis dataKey="key"/>*/}
+                            {/*<YAxis />*/}
+                            {/*<CartesianGrid stroke="#eee" strokeDasharray="5 5"/>*/}
+                            {/*<Line dataKey="comments" fill="blue" />\*/}
+                            {/*<Tooltip/>*/}
+                            {/*<Legend/>*/}
+                        {/*</LineChart>*/}
+
                     </Collapse>
                     :
                     <Collapse isOpen={this.state.isOpen}>

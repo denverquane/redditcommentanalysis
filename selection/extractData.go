@@ -106,6 +106,7 @@ func ExtractCriteriaDataToFile(criteria string, value string, year string, month
 				log.Println(e)
 			} else {
 				outputFileWriter.Write(marshalled)
+				outputFileWriter.Write([]byte("\n"))
 				extractedCommentCount++
 			}
 		}

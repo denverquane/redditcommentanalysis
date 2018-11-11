@@ -1,11 +1,13 @@
 package selection
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -25,28 +27,45 @@ type ProcessedSubredditStats struct {
 	KeywordCommentKarmas  map[string]float64 //total karma for unique occurrences of the keyword
 }
 
-func OpenExtractedSubredditDatafile(basedir string, subreddit string, extractedType string, progress *float64) ProcessedSubredditStats {
+func OpenExtractedSubredditDatafile(basedir, month, year, subreddit, extractedType string, progress *float64) ProcessedSubredditStats {
 	retSummary := ProcessedSubredditStats{make(map[string]float64, 0), make(map[string]float64)}
 	var commentData []map[string]string
+	str := basedir + "/Extracted/" + year + "/" + month + "/subreddit_" + subreddit + "_" + extractedType
 
-	for i, v := range AllMonths {
-		fmt.Println("Reading " + v)
-		var tempCommData []map[string]string
-		str := basedir + "/" + v + "/" + "subreddit_" + subreddit + "_" + extractedType
-		plan, fileOpenErr := ioutil.ReadFile(str)
-		if fileOpenErr != nil {
-			log.Fatal("failed to open " + str)
-		}
-		*progress = 0.75 * ((float64(i) + 0.5) * percentPerMonth)
-		fmt.Println("Opened " + v)
-		err := json.Unmarshal(plan, &tempCommData)
-		if err != nil {
-			log.Println(err)
-		}
-		fmt.Println(subreddit + " has " + strconv.FormatInt(int64(len(tempCommData)), 10) + " comments in " + v)
-		commentData = append(commentData, tempCommData...)
-		*progress = 0.75 * ((float64(i) + 1.0) * percentPerMonth)
+	extractedDataFile, fileOpenErr := os.Open(str)
+	if fileOpenErr != nil {
+		log.Fatal("failed to open " + str)
 	}
+	extractedDataFileReader := bufio.NewReaderSize(extractedDataFile, 4096)
+
+	for {
+		var tempComment map[string]string
+		line := recurseBuildCompleteLine(extractedDataFileReader)
+		if line == nil {
+			break
+		} else {
+			err := json.Unmarshal(line, &tempComment)
+			if err != nil {
+				log.Fatal(err)
+			}
+			commentData = append(commentData, tempComment)
+		}
+	}
+
+	//	if fileOpenErr != nil {
+	//		log.Fatal("failed to open " + str)
+	//	}
+	//	*progress = 0.75 * ((float64(i) + 0.5) * percentPerMonth)
+	//	fmt.Println("Opened " + v)
+	//	err := json.Unmarshal(plan, &tempCommData)
+	//	if err != nil {
+	//		log.Println(err)
+	//	}
+	//	fmt.Println(subreddit + " has " + strconv.FormatInt(int64(len(tempCommData)), 10) + " comments in " + v)
+	//	commentData = append(commentData, tempCommData...)
+	//	*progress = 0.75 * ((float64(i) + 1.0) * percentPerMonth)
+	//}
+
 	fmt.Println(strconv.Itoa(len(commentData)) + " total comments")
 	*progress = 75
 

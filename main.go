@@ -8,6 +8,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/joho/godotenv"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -24,6 +25,17 @@ var upgrader = websocket.Upgrader{
 		return true
 	},
 }
+
+type SubredditJob struct {
+	Year      string
+	Month     string
+	Subreddit string
+}
+
+//TODO move this out of main!
+var extractSubQueue = make([]SubredditJob, 0)
+var processSubQueue = make([]SubredditJob, 0)
+var subredditStatuses = make(map[string]subredditStatus)
 
 func main() {
 	var DataDirectory string
@@ -58,7 +70,9 @@ func main() {
 		fmt.Println("] to extract ")
 	}
 
-	//checkForExtractedSubs("2016", "Basic")
+	checkForExtractedSubs("2012", "Basic")
+	checkForExtractedSubs("2016", "Basic")
+	checkForExtractedSubs("2017", "Basic")
 
 	if RunServer == "true" {
 		log.Fatal(run(ServerPort))
@@ -67,8 +81,8 @@ func main() {
 		subreddit := "funny"
 		schema := "Basic"
 		//var prog float64
-		//_ = selection.SaveCriteriaDataToFile("subreddit", "funny", "2016", os.Getenv("BASE_DATA_DIRECTORY"), selection.BasicSchema, &prog)
-		selection.OpenExtractedSubredditDatafile(DataDirectory+"/"+year, subreddit, schema, &processingProg)
+		//_ = selection.SaveCriteriaDataToFile("Subreddit", "funny", "2016", os.Getenv("BASE_DATA_DIRECTORY"), selection.BasicSchema, &prog)
+		selection.OpenExtractedSubredditDatafile(DataDirectory, "Jan", year, subreddit, schema, &processingProg)
 		//scanDirForExtractedSubData(os.Getenv("BASE_DATA_DIRECTORY") + "/2016/Jan", "Basic")
 
 	}
@@ -93,83 +107,86 @@ func run(port string) error {
 	return nil
 }
 
-//func checkForExtractedSubs(year string, schema string) {
-//	dir := os.Getenv("BASE_DATA_DIRECTORY") + "/" + year + "/"
-//
-//	for _, month := range selection.AllMonths {
-//		arr := selection.ScanDirForExtractedSubData(dir+month, schema) //scan the current month folder for all subs
-//
-//		for _, sub := range arr {
-//			fmt.Println("Checking " + sub)
-//			var commentCount int64
-//			str := os.Getenv("BASE_DATA_DIRECTORY") + "/" + year + "/" + month + "/" + "subreddit_" + sub + "_" + schema + "_count"
-//			plan, fileOpenErr := ioutil.ReadFile(str)
-//			if fileOpenErr != nil {
-//				log.Println("Failed to open " + str + ", now opening datafile and writing total comment count to file")
-//				var comments []map[string]string
-//				str := os.Getenv("BASE_DATA_DIRECTORY") + "/" + year + "/" + month + "/" + "subreddit_" + sub + "_" + schema
-//				plan, fileOpenErr := ioutil.ReadFile(str)
-//				if fileOpenErr != nil {
-//					log.Fatal("failed to open " + str)
-//				}
-//				err := json.Unmarshal(plan, &comments)
-//				if err != nil {
-//					log.Println(err)
-//				}
-//				file, err2 := os.Create(os.Getenv("BASE_DATA_DIRECTORY") + "/" + year + "/" + month + "/" + "subreddit_" + sub + "_" + schema + "_count")
-//				if err != nil {
-//					log.Println(err2)
-//				}
-//				length := strconv.FormatInt(int64(len(comments)), 10)
-//				file.Write([]byte(length))
-//				fmt.Println("Wrote " + length + " to file for " + sub + " in " + month)
-//
-//				commentCount = int64(len(comments))
-//				file.Close()
-//			} else {
-//				err := json.Unmarshal(plan, &commentCount)
-//				if err != nil {
-//					log.Fatal("Failed to unmarshal extracted data for " + sub)
-//				} else {
-//					fmt.Println("Extracted " + strconv.FormatInt(commentCount, 10))
-//				}
-//			}
-//
-//			if val, ok := subredditStatuses[sub]; ok {
-//				val.ExtractedMonthCommentCounts[month] = commentCount
-//			} else {
-//				status := subredditStatus{Extracting: false, ExtractedMonthCommentCounts: make(map[string]int64, 1), Processing: false, ProcessedSummary: selection.ProcessedSubredditStats{}}
-//				status.ExtractedMonthCommentCounts[month] = commentCount
-//				subredditStatuses[sub] = status
-//			}
-//		}
-//	}
-//	for sub, val := range subredditStatuses {
-//		all := true
-//		for _, mon := range selection.AllMonths {
-//			if _, ok := val.ExtractedMonthCommentCounts[mon]; !ok {
-//				all = false
-//			}
-//		}
-//		if all {
-//			fmt.Println("Found ALL entries for " + sub)
-//			val.Extracted = true
-//			subredditStatuses[sub] = val
-//		} else {
-//			log.Println("Missing entries for " + sub)
-//		}
-//	}
-//}
+func checkForExtractedSubs(year string, schema string) {
+	baseDir := os.Getenv("BASE_DATA_DIRECTORY")
 
-//TODO move this out of main!
-var extractSubQueue = make([]string, 0)
-var processSubQueue = make([]string, 0)
-var subredditStatuses = make(map[string]subredditStatus)
+	yearDirectory := baseDir + "/Extracted/" + year + "/"
+
+	for _, month := range selection.AllMonths {
+		arr := selection.ScanDirForExtractedSubData(yearDirectory+month, schema) //scan the current Month folder for all subs
+
+		for _, sub := range arr {
+			fmt.Println("Checking " + sub)
+			var commentCount int64
+			str := yearDirectory + month + "/subreddit_" + sub + "_" + schema + "_count"
+			plan, fileOpenErr := ioutil.ReadFile(str)
+			if fileOpenErr != nil {
+				log.Println("Failed to open " + str + ", now opening datafile and writing total comment count to file")
+				var comments []map[string]string
+				str := yearDirectory + month + "/" + "subreddit_" + sub + "_" + schema
+
+				f, err := os.Open(str)
+				if err != nil {
+					log.Println(err)
+				}
+				lines, err2 := selection.LineCounter(f)
+				if err2 != nil {
+					log.Println(err2)
+				}
+
+				file, err2 := os.Create(yearDirectory + month + "/" + "subreddit_" + sub + "_" + schema + "_count")
+				if err != nil {
+					log.Println(err2)
+				}
+				length := strconv.FormatInt(int64(lines), 10)
+				file.Write([]byte(length))
+				fmt.Println("Wrote " + length + " to file for " + sub + " in " + month)
+
+				commentCount = int64(len(comments))
+				file.Close()
+			} else {
+				err := json.Unmarshal(plan, &commentCount)
+				if err != nil {
+					log.Fatal("Failed to unmarshal extracted data for " + sub)
+				} else {
+					fmt.Println("Extracted " + strconv.FormatInt(commentCount, 10))
+				}
+			}
+
+			if val, ok := subredditStatuses[sub]; ok {
+				if val.ExtractedMonthCommentCounts[year] == nil {
+					val.ExtractedMonthCommentCounts[year] = make(map[string]int64, 1)
+				}
+				val.ExtractedMonthCommentCounts[year][month] = commentCount
+			} else {
+				status := subredditStatus{Extracting: false, ExtractedMonthCommentCounts: make(map[string]map[string]int64, 1), Processing: false, ProcessedSummary: selection.ProcessedSubredditStats{}}
+				status.ExtractedMonthCommentCounts[year] = make(map[string]int64, 1)
+				status.ExtractedMonthCommentCounts[year][month] = commentCount
+				subredditStatuses[sub] = status
+			}
+		}
+	}
+	//for sub, val := range subredditStatuses {
+	//	all := true
+	//	for _, mon := range selection.AllMonths {
+	//		if _, ok := val.ExtractedMonthCommentCounts[mon]; !ok {
+	//			all = false
+	//		}
+	//	}
+	//	if all {
+	//		fmt.Println("Found ALL entries for " + sub)
+	//		val.Extracted = true
+	//		subredditStatuses[sub] = val
+	//	} else {
+	//		log.Println("Missing entries for " + sub)
+	//	}
+	//}
+}
 
 type subredditStatus struct {
 	Extracting                  bool
 	Extracted                   bool
-	ExtractedMonthCommentCounts map[string]int64
+	ExtractedMonthCommentCounts map[string]map[string]int64
 	Processing                  bool
 	Processed                   bool
 	ProcessedSummary            selection.ProcessedSubredditStats
@@ -197,9 +214,9 @@ func makeMuxRouter() http.Handler {
 	muxRouter.HandleFunc("/api", handleIndex).Methods("GET")
 	muxRouter.HandleFunc("/api/status", handleStatus).Methods("GET", "OPTIONS")
 	muxRouter.HandleFunc("/api/subs", handleGetSubs).Methods("GET")
-	muxRouter.HandleFunc("/api/extractSub/{subreddit}", handleExtractSub).Methods("POST")
-	muxRouter.HandleFunc("/api/status/{subreddit}", handleViewStatus).Methods("GET")
-	muxRouter.HandleFunc("/api/processSub/{subreddit}", handleProcessSub).Methods("POST")
+	muxRouter.HandleFunc("/api/extractSub/{Subreddit}/{Month}/{Year}", handleExtractSub).Methods("POST")
+	muxRouter.HandleFunc("/api/status/{Subreddit}", handleViewStatus).Methods("GET")
+	muxRouter.HandleFunc("/api/processSub/{Subreddit}", handleProcessSub).Methods("POST")
 	muxRouter.HandleFunc("/api/mockStatus", handleMockStatus).Methods("GET")
 	muxRouter.HandleFunc("/ws", handleConnections)
 	return muxRouter
@@ -210,9 +227,9 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "Welcome to the Reddit Comment Extractor!\nThese are the endpoints to use:\n")
 	io.WriteString(w, "GET \"/api/status\" displays the overall status of this server and its data Processing\n")
 	io.WriteString(w, "GET \"/api/subs\" lists all subreddits with all comments extracted and/or processed\n")
-	io.WriteString(w, "POST \"/api/extractSub/<sub>\" extracts ALL comments from the <sub> subreddit, and saves to a datafile for later Processing\n")
-	io.WriteString(w, "POST \"/api/processSub/<sub>\" processes the previously-extracted data for a subreddit, and saves these processed analytics for later retrieval\n")
-	io.WriteString(w, "GET \"/api/status/<sub>\" displays the extraction and Processing status for a subreddit\n")
+	io.WriteString(w, "POST \"/api/extractSub/<sub>/<Month>/<Year>\" extracts ALL comments from the <sub> Subreddit, and saves to a datafile for later Processing\n")
+	io.WriteString(w, "POST \"/api/processSub/<sub>\" processes the previously-extracted data for a Subreddit, and saves these processed analytics for later retrieval\n")
+	io.WriteString(w, "GET \"/api/status/<sub>\" displays the extraction and Processing status for a Subreddit\n")
 }
 
 func handleConnections(w http.ResponseWriter, r *http.Request) {
@@ -257,21 +274,21 @@ func handleMessages() {
 }
 
 func handleMockStatus(w http.ResponseWriter, r *http.Request) {
-	writeStdHeaders(w)
-	status := ServerStatus{true, 65.67895, []string{"sample", "sample2"},
-		true, 77.5678, []string{"sample3", "sample4"}}
-	bytes, _ := json.Marshal(status)
-	io.WriteString(w, string(bytes))
+	//writeStdHeaders(w)
+	//status := ServerStatus{true, 65.67895, []string{"sample", "sample2"},
+	//	true, 77.5678, []string{"sample3", "sample4"}}
+	//bytes, _ := json.Marshal(status)
+	//io.WriteString(w, string(bytes))
 }
 
 type ServerStatus struct {
 	Processing      bool
 	ProcessProgress float64
-	ProcessQueue    []string
+	ProcessQueue    []SubredditJob
 
 	Extracting      bool
 	ExtractProgress float64
-	ExtractQueue    []string
+	ExtractQueue    []SubredditJob
 }
 
 func handleStatus(w http.ResponseWriter, r *http.Request) {
@@ -283,7 +300,7 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 	} else {
 		status.Extracting = false
 		status.ExtractProgress = 100
-		status.ExtractQueue = make([]string, 0)
+		status.ExtractQueue = make([]SubredditJob, 0)
 	}
 
 	if len(processSubQueue) > 0 {
@@ -293,7 +310,7 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 	} else {
 		status.Processing = false
 		status.ProcessProgress = 100
-		status.ProcessQueue = make([]string, 0)
+		status.ProcessQueue = make([]SubredditJob, 0)
 	}
 	bytes, _ := json.Marshal(status)
 
@@ -326,59 +343,66 @@ func handleGetSubs(w http.ResponseWriter, r *http.Request) {
 
 func handleExtractSub(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	subreddit := vars["subreddit"]
+	subreddit := vars["Subreddit"]
+	month := vars["Month"]
+	year := vars["Year"]
 	writeStdHeaders(w)
-	if val, ok := subredditStatuses[subreddit]; ok {
-		if val.Extracting || len(val.ExtractedMonthCommentCounts) != 0 {
-			io.WriteString(w, "Subreddit "+subreddit+" has been extracted, is Extracting, or is in the queue for extraction!\n")
-			io.WriteString(w, val.ToString())
-		}
-	} else {
-		extractSubQueue = append(extractSubQueue, subreddit)
-		io.WriteString(w, subreddit+" appended to extraction queue!\nNew job queue:\n")
-		str := ""
-		for i, v := range extractSubQueue {
-			str += strconv.Itoa(i+1) + ". " + v + "\n"
-		}
-
-		subredditStatuses[subreddit] = subredditStatus{}
-
-		if len(extractSubQueue) == 1 {
-			go extractQueue() //this is the main goroutine that will extract all the future jobs
-		}
-		io.WriteString(w, str)
+	//if _, ok := subredditStatuses[Subreddit]; ok {
+	//	// TODO fix this
+	//	//if val.Extracting || len(val.ExtractedMonthCommentCounts) != 0 {
+	//	//	io.WriteString(w, "Subreddit "+Subreddit+" has been extracted, is Extracting, or is in the queue for extraction!\n")
+	//	//	io.WriteString(w, val.ToString())
+	//	//}
+	//} else {
+	job := SubredditJob{Month: month, Year: year, Subreddit: subreddit}
+	extractSubQueue = append(extractSubQueue, job)
+	io.WriteString(w, subreddit+" in "+month+"/"+year+" appended to extraction queue!\nNew job queue:\n")
+	str := ""
+	for i, v := range extractSubQueue {
+		str += strconv.Itoa(i+1) + ". " + v.Subreddit + "\n"
 	}
+
+	subredditStatuses[subreddit] = subredditStatus{}
+
+	if len(extractSubQueue) == 1 {
+		go extractQueue() //this is the main goroutine that will extract all the future jobs
+	}
+	io.WriteString(w, str)
+	//}
 }
 
 var extractingProg float64
 var processingProg float64
 
 func extractQueue() {
-	tempSub := ""
+	var tempSub SubredditJob
 	for len(extractSubQueue) > 0 {
 		tempSub = extractSubQueue[0]
-		if v, ok := subredditStatuses[tempSub]; !ok {
-			subredditStatuses[tempSub] = subredditStatus{Extracting: true,
-				ExtractedMonthCommentCounts: make(map[string]int64, 0), Processing: false, ProcessedSummary: selection.ProcessedSubredditStats{}}
+		if v, ok := subredditStatuses[tempSub.Subreddit]; !ok {
+			subredditStatuses[tempSub.Subreddit] = subredditStatus{Extracting: true,
+				ExtractedMonthCommentCounts: make(map[string]map[string]int64, 0), Processing: false, ProcessedSummary: selection.ProcessedSubredditStats{}}
 		} else {
 			v.Extracting = true
-			subredditStatuses[tempSub] = v
+			subredditStatuses[tempSub.Subreddit] = v
 			extractingProg = 0
 		}
 		go monitorProgress(&extractingProg)
 
-		//TODO ensure that the month/year for extraction is present in the list of uncompressed data entries
-		summary := selection.ExtractCriteriaDataToFile("subreddit", tempSub, "2012", "Jan",
+		//TODO ensure that the Month/Year for extraction is present in the list of uncompressed data entries
+		summary := selection.ExtractCriteriaDataToFile("Subreddit", tempSub.Subreddit, tempSub.Year, tempSub.Month,
 			os.Getenv("BASE_DATA_DIRECTORY"), selection.BasicSchema, &extractingProg)
 
-		v := subredditStatuses[tempSub]
+		v := subredditStatuses[tempSub.Subreddit]
 		v.Extracting = false
 		v.Extracted = true
 		if v.ExtractedMonthCommentCounts == nil {
-			v.ExtractedMonthCommentCounts = make(map[string]int64, 1)
+			v.ExtractedMonthCommentCounts = make(map[string]map[string]int64, 1)
 		}
-		v.ExtractedMonthCommentCounts["Jan"] = summary
-		subredditStatuses[tempSub] = v
+		if v.ExtractedMonthCommentCounts[tempSub.Year] == nil {
+			v.ExtractedMonthCommentCounts[tempSub.Year] = make(map[string]int64, 1)
+		}
+		v.ExtractedMonthCommentCounts[tempSub.Year][tempSub.Month] = summary
+		subredditStatuses[tempSub.Subreddit] = v
 		extractSubQueue = extractSubQueue[1:] //done
 		fmt.Println("COMPLETED")
 		broadcast <- "fetch"
@@ -387,7 +411,9 @@ func extractQueue() {
 
 func handleProcessSub(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	subreddit := vars["subreddit"]
+	subreddit := vars["Subreddit"]
+	month := vars["Month"]
+	year := vars["Year"]
 
 	writeStdHeaders(w)
 	if val, ok := subredditStatuses[subreddit]; ok {
@@ -398,12 +424,13 @@ func handleProcessSub(w http.ResponseWriter, r *http.Request) {
 		} else if val.Extracting {
 			io.WriteString(w, "Subreddit \""+subreddit+"\" is still being extracted")
 		} else if val.Extracted {
-			processSubQueue = append(processSubQueue, subreddit)
+			job := SubredditJob{Month: month, Year: year, Subreddit: subreddit}
+			processSubQueue = append(processSubQueue, job)
 
 			io.WriteString(w, "{ "+subreddit+" appended to Processing queue!\nNew job queue:\n")
 			str := ""
 			for i, v := range processSubQueue {
-				str += strconv.Itoa(i+1) + ". " + v + "\n"
+				str += strconv.Itoa(i+1) + ". " + v.Subreddit + "\n"
 			}
 
 			if len(processSubQueue) == 1 {
@@ -411,33 +438,33 @@ func handleProcessSub(w http.ResponseWriter, r *http.Request) {
 			}
 			io.WriteString(w, str+"}")
 		} else {
-			io.WriteString(w, "Subreddit has not been extracted or processed yet, please hit the endpoint \"/extractSub/"+subreddit+"\" to extract the subreddit data first")
+			io.WriteString(w, "Subreddit has not been extracted or processed yet, please hit the endpoint \"/extractSub/"+subreddit+"\" to extract the Subreddit data first")
 		}
 	} else {
-		io.WriteString(w, "Subreddit has not been extracted or processed yet, please hit the endpoint \"/extractSub/"+subreddit+"\" to extract the subreddit data first")
+		io.WriteString(w, "Subreddit has not been extracted or processed yet, please hit the endpoint \"/extractSub/"+subreddit+"\" to extract the Subreddit data first")
 	}
 }
 
 func processQueue() {
-	tempSub := ""
+	var tempSub SubredditJob
 	for len(processSubQueue) > 0 {
 		tempSub = processSubQueue[0]
-		if v, ok := subredditStatuses[tempSub]; !ok {
+		if v, ok := subredditStatuses[tempSub.Subreddit]; !ok {
 			log.Fatal("Tried to process a sub not found in the registry!")
 		} else {
 			v.Processing = true
 			processingProg = 0
-			subredditStatuses[tempSub] = v
+			subredditStatuses[tempSub.Subreddit] = v
 		}
 
 		go monitorProgress(&processingProg)
-		sum := selection.OpenExtractedSubredditDatafile(os.Getenv("BASE_DATA_DIRECTORY")+"/"+"2016", tempSub, "Basic", &processingProg)
+		sum := selection.OpenExtractedSubredditDatafile(os.Getenv("BASE_DATA_DIRECTORY"), tempSub.Month, tempSub.Year, tempSub.Subreddit, "Basic", &processingProg)
 
-		v := subredditStatuses[tempSub]
+		v := subredditStatuses[tempSub.Subreddit]
 		v.Processing = false
 		v.Processed = true
 		v.ProcessedSummary = sum
-		subredditStatuses[tempSub] = v
+		subredditStatuses[tempSub.Subreddit] = v
 		processSubQueue = processSubQueue[1:] //done
 		fmt.Println("COMPLETED")
 		broadcast <- "fetch"
@@ -459,14 +486,11 @@ func monitorProgress(prog *float64) {
 
 func handleViewStatus(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	subreddit := vars["subreddit"]
+	subreddit := vars["Subreddit"]
 
 	if val, ok := subredditStatuses[subreddit]; !ok {
 		io.WriteString(w, "{}")
 	} else {
-		if len(subredditStatuses[subreddit].ExtractedMonthCommentCounts) != 12 {
-			val.ExtractedMonthCommentCounts = make(map[string]int64)
-		}
 		data, _ := json.Marshal(val)
 		io.WriteString(w, string(data))
 	}
