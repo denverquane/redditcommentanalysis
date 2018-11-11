@@ -89,10 +89,13 @@ func OpenExtractedSubredditDatafile(basedir, month, year, subreddit, extractedTy
 	*progress = 80
 	fmt.Println("getting sentiments")
 	var sentTotal = 0.0
-	for _, v := range commentData {
+	for i, v := range commentData {
 		str := v["body"]
 		if str == "" {
 			continue
+		}
+		if i%10000 == 0 {
+			fmt.Println("Finished with " + strconv.Itoa(i) + " of " + strconv.Itoa(lines) + " total")
 		}
 		str = GetSentimentForString("http://192.168.1.192:8888", str)
 		f64 := fastjson.GetFloat64([]byte(str), "comparative")

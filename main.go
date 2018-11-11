@@ -51,9 +51,6 @@ func main() {
 
 	// TODO if /data doesn't work (or have the right format?) exit the program with error
 
-	resp := selection.GetSentimentForString("http://192.168.1.192:8888", "happy happy happy evil")
-	fmt.Println(resp)
-
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	} else {
@@ -166,21 +163,6 @@ func checkForExtractedSubs(year string, schema string) {
 			}
 		}
 	}
-	//for sub, val := range subredditStatuses {
-	//	all := true
-	//	for _, mon := range selection.AllMonths {
-	//		if _, ok := val.ExtractedMonthCommentCounts[mon]; !ok {
-	//			all = false
-	//		}
-	//	}
-	//	if all {
-	//		fmt.Println("Found ALL entries for " + sub)
-	//		val.Extracted = true
-	//		subredditStatuses[sub] = val
-	//	} else {
-	//		log.Println("Missing entries for " + sub)
-	//	}
-	//}
 }
 
 type subredditStatus struct {
