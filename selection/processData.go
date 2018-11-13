@@ -224,7 +224,7 @@ func ScanDirForExtractedSubData(directory string, schema string) []string {
 	subs := make([]string, 0)
 	dirList, _ := ioutil.ReadDir(directory)
 	for _, v := range dirList {
-		if strings.Contains(v.Name(), "subreddit_") && strings.Contains(v.Name(), "_"+schema) && !strings.Contains(v.Name(), "_count") {
+		if strings.Contains(v.Name(), "subreddit_") && strings.Contains(v.Name(), "_"+schema) && !strings.Contains(v.Name(), "_count") && !strings.Contains(v.Name(), ".tmp") {
 			str := strings.Replace(v.Name(), "subreddit_", "", -1)
 			str = strings.Replace(str, "_"+schema, "", -1)
 			subs = append(subs, str)

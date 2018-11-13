@@ -8,7 +8,7 @@ import Sockette from 'sockette';
 import '@blueprintjs/core/lib/css/blueprint.css';
 
 let Months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-let IP = "localhost";
+let IP = "dquane.tplinkdns.com";
 
 const AppToaster = Toaster.create({
     className: "notifyToaster",
@@ -372,7 +372,7 @@ export class MonthYearSelector extends React.Component {
                 <Button onClick={() => {
                     console.log(this.state.PendingJobs);
                     for (let mo in this.state.PendingJobs) {
-                        this.state.ExtractFunc(this.props.Subreddit, mo, this.state.Year);
+                        this.state.ExtractFunc(this.props.Subreddit, this.state.PendingJobs[mo], this.state.Year);
                     }
                     
                 }}
