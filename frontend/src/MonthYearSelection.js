@@ -1,5 +1,8 @@
 import React from 'react';
 import { Checkbox, Button } from '@blueprintjs/core'
+import { connect } from 'react-redux';
+
+import { addExtractionJob } from './reducer'
 
 let Months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -25,14 +28,14 @@ export class MonthYearSelector extends React.Component {
             if (this.state.Months[Months[mo]]) {
                 if (this.state.Months[Months[mo]] === -1) {
                     arr.push(
-                        <Checkbox key= {Months[mo]} disabled={true}>{Months[mo]}: No Data</Checkbox>
+                        <Checkbox key={Months[mo]} disabled={true}>{Months[mo]}: No Data</Checkbox>
                     )
                 } else {
-                    arr.push(<Checkbox key= {Months[mo]} checked={true}>{Months[mo]} : {this.state.Months[Months[mo]]} Comments</Checkbox>)
+                    arr.push(<Checkbox key={Months[mo]} checked={true}>{Months[mo]} : {this.state.Months[Months[mo]]} Comments</Checkbox>)
                 }
             } else {
                 arr.push(
-                    <Checkbox key= {Months[mo]} onChange={(val) => {
+                    <Checkbox key={Months[mo]} onChange={(val) => {
                         if (this.state.PendingJobs.indexOf(Months[mo]) === -1) {
                             let joined = this.state.PendingJobs.concat(Months[mo])
                             this.setState({ PendingJobs: joined });
@@ -64,10 +67,22 @@ export class MonthYearSelector extends React.Component {
                     for (let mo in this.state.PendingJobs) {
                         this.state.ExtractFunc(this.props.Subreddit, this.state.PendingJobs[mo], this.state.Year);
                     }
-                    
+
                 }}
-                disabled={this.state.PendingJobs.length === 0}>Confirm</Button>
+                    disabled={this.state.PendingJobs.length === 0}>Confirm</Button>
             </div>
         )
     }
 }
+const mapStateToProps = state => {
+    // let storedEvents = state.events.map(event => ({ key: event.UID, ...event }));
+    return {
+        extractionJobs: state.extractionJobs
+    };
+};
+
+const mapDispatchToProps = {
+    addExtractionJob
+};
+
+export default connect(mapStateToProps, mapDispatchToProps)(MonthYearSelector);

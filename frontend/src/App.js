@@ -6,6 +6,7 @@ import { Circle } from 'rc-progress'
 import Sockette from 'sockette';
 import { CollapseExample } from './Collapse' 
 import {MonthYearSelector} from './MonthYearSelection'
+import {reducer} from './reducer'
 
 import '@blueprintjs/core/lib/css/blueprint.css';
 
