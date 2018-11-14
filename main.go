@@ -263,6 +263,7 @@ func makeMuxRouter() http.Handler {
 	muxRouter.HandleFunc("/api/extractSub/{Subreddit}/{Month}/{Year}", handleExtractSub).Methods("POST")
 	muxRouter.HandleFunc("/api/status/{Subreddit}", handleViewStatus).Methods("GET")
 	muxRouter.HandleFunc("/api/processSub/{Subreddit}/{Month}/{Year}", handleProcessSub).Methods("POST")
+	muxRouter.HandleFunc("/api/addSubEntry/{Subreddit}", addSubredditEntry).Methods("POST")
 	muxRouter.HandleFunc("/api/mockStatus", handleMockStatus).Methods("GET")
 	muxRouter.HandleFunc("/ws", handleConnections)
 	return muxRouter
@@ -528,7 +529,44 @@ func monitorProgress(prog *float64) {
 	}
 }
 
+func addSubredditEntry(w http.ResponseWriter, r *http.Request) {
+	writeStdHeaders(w)
+	vars := mux.Vars(r)
+	subreddit := vars["Subreddit"]
+
+	if _, ok := subredditStatuses[subreddit]; !ok {
+		subredditStatuses[subreddit] = subredditStatus{Extracting: false, ExtractedMonthCommentCounts: make(map[string]map[string]int64, 0), Processing: false, ProcessedSummary: selection.ProcessedSubredditStats{}}
+		for yearIdx, monthsAvailableArray := range YearsAndMonthsAvailable {
+			//Ensure all the available years are in the status
+			if _, ok := subredditStatuses[subreddit].ExtractedMonthCommentCounts[yearIdx]; !ok {
+				subredditStatuses[subreddit].ExtractedMonthCommentCounts[yearIdx] = make(map[string]int64, 0)
+			}
+
+			for _, month := range selection.AllMonths {
+				found := false
+				for _, monAvailable := range monthsAvailableArray {
+					if monthToShortIntString(monAvailable) == month {
+						found = true
+						break
+					}
+				}
+
+				//the month isn't available
+				if !found {
+					subredditStatuses[subreddit].ExtractedMonthCommentCounts[yearIdx][month] = -1
+					//fmt.Println("Marked " + yearIdx + "/" + month + " as unavailable")
+				}
+
+			}
+
+		}
+		io.WriteString(w, "{}")
+	}
+
+}
+
 func handleViewStatus(w http.ResponseWriter, r *http.Request) {
+	writeStdHeaders(w)
 	vars := mux.Vars(r)
 	subreddit := vars["Subreddit"]
 
@@ -538,7 +576,6 @@ func handleViewStatus(w http.ResponseWriter, r *http.Request) {
 		data, _ := json.Marshal(val)
 		io.WriteString(w, string(data))
 	}
-	writeStdHeaders(w)
 }
 
 func writeStdHeaders(w http.ResponseWriter) {

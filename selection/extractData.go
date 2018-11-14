@@ -37,6 +37,7 @@ func getCommentDataFromLine(line []byte, keyTypes map[string]string) map[string]
 		if v == "str" {
 			if key == "body" {
 				result[key] = filter.ReplaceAllString(filterStopWordsFromString(strings.ToLower(fastjson.GetString(line, key))), "")
+				result["sentiment"] = strconv.FormatFloat(GetSentimentForString("http://192.168.1.192:8888", result[key]), 'f', 10, 64)
 			} else {
 				result[key] = strings.ToLower(fastjson.GetString(line, key))
 			}
@@ -129,7 +130,7 @@ func ExtractCriteriaDataToFile(criteria string, value string, year string, month
 
 	if extractedCommentCount == 0 {
 		log.Println("Found 0 comments for " + criteria + ":" + value + " in " + month + ", exiting extraction!")
-		return commentsInRawFile
+		return extractedCommentCount
 	} else {
 		log.Println("Extracted " + strconv.FormatInt(extractedCommentCount, 10) + " comments for " +
 			criteria + " = " + value + " in " + month + "/" + year)
@@ -149,5 +150,5 @@ func ExtractCriteriaDataToFile(criteria string, value string, year string, month
 	err := os.Rename(outputFilePath+".tmp", outputFilePath)
 	log.Println(err)
 
-	return linesRead
+	return extractedCommentCount
 }

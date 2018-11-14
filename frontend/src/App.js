@@ -111,10 +111,10 @@ class App extends Component {
                     <div style={{ width: '25%' }} />
                     <div style={{ width: '35%' }}><InputGroup
                         onChange={(event) => (this.setState({ ...this.state, TempExtractName: event.target.value }))} /></div>
-                    <div style={{ width: '15%' }}><Button onClick={() => {
-                        this.extractSubreddit(this.state.TempExtractName);
+                    <div style={{ width: '20%' }}><Button onClick={() => {
+                        this.addSubredditEntry(this.state.TempExtractName);
                         console.log(this.state.TempExtractName);
-                    }}>Extract Sub</Button></div>
+                    }}>Add Subreddit Entry</Button></div>
                 </div>
                 {this.displaySubs()}
                 {/* {this.state.Subs.EarthPorn ? (this.state.Subs.EarthPorn.Processing ? <p>'True'</p> : <p>'False'</p>) : ''} */}
@@ -131,8 +131,10 @@ class App extends Component {
             for (let yr in substatus["ExtractedMonthCommentCounts"]) {
                 let months = [];
                 for (let month in substatus["ExtractedMonthCommentCounts"][yr]) {
-                    months.push(<div><h3>{month}</h3><p>{substatus["ExtractedMonthCommentCounts"][yr][month]}</p></div>)
-                    totalComments += substatus["ExtractedMonthCommentCounts"][yr][month]
+                    months.push(<div><h3>{month}</h3><p>{substatus["ExtractedMonthCommentCounts"][yr][month]}</p></div>);
+                    if (substatus["ExtractedMonthCommentCounts"][yr][month] !== -1) {
+                        totalComments += substatus["ExtractedMonthCommentCounts"][yr][month]
+                    }
                 }
                 years.push(
                     <MonthYearSelector Year={yr} Months={substatus["ExtractedMonthCommentCounts"][yr]} Subreddit={key} ExtractFunc={this.extractSubreddit} />
@@ -264,6 +266,17 @@ class App extends Component {
                 AppToaster.show({ message: 'Asked backend to extract: ' + sub, intent: Intent.NONE });
             
             });
+    }
+
+    addSubredditEntry(sub) {
+        fetch('http://' + IP + ':5000/api/addSubEntry/' + sub, {
+            method: 'post'
+        })
+            .then(results => {
+                return results;
+            }).then(data => {
+                this.getSubs();
+        });
     }
 }
 
