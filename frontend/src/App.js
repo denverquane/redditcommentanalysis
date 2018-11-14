@@ -8,7 +8,7 @@ import Sockette from 'sockette';
 import '@blueprintjs/core/lib/css/blueprint.css';
 
 let Months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-let IP = "dquane.tplinkdns.com";
+let IP = "localhost";
 
 const AppToaster = Toaster.create({
     className: "notifyToaster",
@@ -132,6 +132,7 @@ class App extends Component {
                 let months = [];
                 for (let month in substatus["ExtractedMonthCommentCounts"][yr]) {
                     months.push(<div><h3>{month}</h3><p>{substatus["ExtractedMonthCommentCounts"][yr][month]}</p></div>)
+                    totalComments += substatus["ExtractedMonthCommentCounts"][yr][month]
                 }
                 years.push(
                     <MonthYearSelector Year={yr} Months={substatus["ExtractedMonthCommentCounts"][yr]} Subreddit={key} ExtractFunc={this.extractSubreddit} />
@@ -140,6 +141,7 @@ class App extends Component {
                     //     {months}
                     // </div>
                 )
+
             }
             // if (!substatus.ExtractedMonthCommentCounts || substatus.ExtractedMonthCommentCounts.length < 12){
             //     continue
@@ -333,13 +335,19 @@ export class MonthYearSelector extends React.Component {
         Months: [],
         PendingJobs: [],
         Year: "",
-    }
+    };
 
     render() {
         let arr = [];
         for (let mo in Months) {
             if (this.state.Months[Months[mo]]) {
-                arr.push(<Tag intent={Intent.SUCCESS}>{Months[mo]} : {this.state.Months[Months[mo]]} Comments</Tag>)
+                if (this.state.Months[Months[mo]] === -1) {
+                    arr.push(
+                        <Checkbox disabled={true}>{Months[mo]}: No Data</Checkbox>
+                    )
+                } else {
+                    arr.push(<Checkbox checked={true}>{Months[mo]} : {this.state.Months[Months[mo]]} Comments</Checkbox>)
+                }
             } else {
                 arr.push(
                     <Checkbox onChange={(val) => {

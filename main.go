@@ -37,9 +37,19 @@ var extractSubQueue = make([]SubredditJob, 0)
 var processSubQueue = make([]SubredditJob, 0)
 var subredditStatuses = make(map[string]subredditStatus)
 
+type subredditStatus struct {
+	Extracting                  bool
+	Extracted                   bool
+	ExtractedMonthCommentCounts map[string]map[string]int64
+	Processing                  bool
+	Processed                   bool
+	ProcessedSummary            selection.ProcessedSubredditStats
+}
+
 var DataDirectory string
 var RunServer string
 var ServerPort string
+var YearsAndMonthsAvailable map[string][]string
 
 func main() {
 
@@ -59,8 +69,8 @@ func main() {
 		ServerPort = os.Getenv("SERVER_PORT")
 	}
 
-	yearsAndMonthsAvailable := selection.ListYearsAndMonthsForExtractionInDir(DataDirectory)
-	for i, v := range yearsAndMonthsAvailable {
+	YearsAndMonthsAvailable = selection.ListYearsAndMonthsForExtractionInDir(DataDirectory)
+	for i, v := range YearsAndMonthsAvailable {
 		fmt.Print(i + " has [ ")
 		for _, vv := range v {
 			fmt.Print(vv + " ")
@@ -68,9 +78,38 @@ func main() {
 		fmt.Println("] to extract ")
 	}
 
-	checkForExtractedSubs("2012", "Basic")
-	checkForExtractedSubs("2016", "Basic")
-	checkForExtractedSubs("2017", "Basic")
+	for yr := range YearsAndMonthsAvailable {
+		//fmt.Println("Checking " + yr)
+		checkForExtractedSubs(yr, "Basic")
+	}
+
+	for _, subredditStatus := range subredditStatuses {
+		for yearIdx, monthsAvailableArray := range YearsAndMonthsAvailable {
+			//Ensure all the available years are in the status
+			if _, ok := subredditStatus.ExtractedMonthCommentCounts[yearIdx]; !ok {
+				subredditStatus.ExtractedMonthCommentCounts[yearIdx] = make(map[string]int64, 0)
+			}
+
+			for _, month := range selection.AllMonths {
+				found := false
+				for _, monAvailable := range monthsAvailableArray {
+					if monthToShortIntString(monAvailable) == month {
+						found = true
+						break
+					}
+				}
+
+				//the month isn't available
+				if !found {
+					subredditStatus.ExtractedMonthCommentCounts[yearIdx][month] = -1
+					//fmt.Println("Marked " + yearIdx + "/" + month + " as unavailable")
+				}
+
+			}
+
+		}
+
+	}
 
 	if RunServer == "true" {
 		log.Fatal(run(ServerPort))
@@ -83,6 +122,37 @@ func main() {
 		selection.OpenExtractedSubredditDatafile(DataDirectory, "Jan", year, subreddit, schema, &processingProg)
 		//scanDirForExtractedSubData(os.Getenv("BASE_DATA_DIRECTORY") + "/2016/Jan", "Basic")
 
+	}
+}
+func monthToShortIntString(month string) string {
+	switch month {
+	case "01":
+		return "Jan"
+	case "02":
+		return "Feb"
+	case "03":
+		return "Mar"
+	case "04":
+		return "Apr"
+	case "05":
+		return "May"
+	case "06":
+		return "Jun"
+	case "07":
+		return "Jul"
+	case "08":
+		return "Aug"
+	case "09":
+		return "Sep"
+	case "10":
+		return "Oct"
+	case "11":
+		return "Nov"
+	case "12":
+		return "Dec"
+	default:
+		log.Println("Invalid month supplied; defaulting to january")
+		return "01"
 	}
 }
 
@@ -111,6 +181,9 @@ func checkForExtractedSubs(year string, schema string) {
 
 	for _, month := range selection.AllMonths {
 		arr := selection.ScanDirForExtractedSubData(yearDirectory+month, schema) //scan the current Month folder for all subs
+		if len(arr) == 0 {
+
+		}
 
 		for _, sub := range arr {
 			fmt.Println("Checking " + sub)
@@ -163,15 +236,6 @@ func checkForExtractedSubs(year string, schema string) {
 			}
 		}
 	}
-}
-
-type subredditStatus struct {
-	Extracting                  bool
-	Extracted                   bool
-	ExtractedMonthCommentCounts map[string]map[string]int64
-	Processing                  bool
-	Processed                   bool
-	ProcessedSummary            selection.ProcessedSubredditStats
 }
 
 func (status subredditStatus) ToString() string {
@@ -344,7 +408,7 @@ func handleExtractSub(w http.ResponseWriter, r *http.Request) {
 		str += strconv.Itoa(i+1) + ". " + v.Subreddit + "\n"
 	}
 
-	subredditStatuses[subreddit] = subredditStatus{}
+	//subredditStatuses[subreddit] = subredditStatus{}
 
 	if len(extractSubQueue) == 1 {
 		go extractQueue() //this is the main goroutine that will extract all the future jobs
