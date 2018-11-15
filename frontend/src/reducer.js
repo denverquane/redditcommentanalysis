@@ -1,4 +1,7 @@
+import { IP } from './App'
+
 export const ADD_EXTRACT_JOB = 'events/ADD_EXTRACT_JOB';
+export const SUBMIT_ORGANIZED_JOBS = 'events/SUBMIT_ORGANIZED_JOBS'
 
 export default function reducer(state = [], action) {
   switch (action.type) {
@@ -21,9 +24,35 @@ export default function reducer(state = [], action) {
         })
       }
       return newState
+
+    case SUBMIT_ORGANIZED_JOBS: 
+      for (let yrIdx in action.organized){
+        for (let moIdx in action.organized[yrIdx]){
+          let subs = action.organized[yrIdx][moIdx]
+
+          extractSubreddits(subs, moIdx, yrIdx)
+        }
+      }
+      return []
     default:
       return state;
   }
+}
+
+function extractSubreddits(subs, month, year) {
+  fetch(
+    "http://" + IP + ":5000/api/extractSubs/" + month + "/" + year,
+    {
+      method: "post",
+      body: JSON.stringify(subs)
+    }
+  )
+    .then(results => {
+      return results;
+    })
+    .then(data => {
+      console.log(data);
+    });
 }
 
 export function addExtractionJob(subreddit, month, year) {
@@ -32,5 +61,12 @@ export function addExtractionJob(subreddit, month, year) {
     subreddit: subreddit,
     month: month,
     year: year
+  };
+}
+
+export function submitOrganizedJobs(organized) {
+  return {
+    type: SUBMIT_ORGANIZED_JOBS,
+    organized: organized
   };
 }

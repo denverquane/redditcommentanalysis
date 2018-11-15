@@ -47,9 +47,10 @@ type subredditStatus struct {
 	Extracting                  bool
 	Extracted                   bool
 	ExtractedMonthCommentCounts map[string]map[string]int64
-	Processing                  bool
-	Processed                   bool
-	ProcessedSummary            selection.ProcessedSubredditStats
+
+	Processing       bool
+	Processed        bool
+	ProcessedSummary selection.ProcessedSubredditStats
 }
 
 var DataDirectory string
@@ -234,6 +235,7 @@ func checkForExtractedSubs(year string, schema string) {
 					val.ExtractedMonthCommentCounts[year] = make(map[string]int64, 1)
 				}
 				val.ExtractedMonthCommentCounts[year][month] = commentCount
+				subredditStatuses[sub] = val
 			} else {
 				status := subredditStatus{Extracting: false, ExtractedMonthCommentCounts: make(map[string]map[string]int64, 1), Processing: false, ProcessedSummary: selection.ProcessedSubredditStats{}}
 				status.ExtractedMonthCommentCounts[year] = make(map[string]int64, 1)
@@ -342,6 +344,7 @@ type ServerStatus struct {
 	Extracting      bool
 	ExtractProgress float64
 	ExtractQueue    []SubredditExtractJob
+	ExtractTimeRem  string
 }
 
 func handleStatus(w http.ResponseWriter, r *http.Request) {
@@ -350,10 +353,12 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 		status.Extracting = true
 		status.ExtractProgress = extractingProg
 		status.ExtractQueue = extractSubQueue
+		status.ExtractTimeRem = extractTimeRemaining
 	} else {
 		status.Extracting = false
 		status.ExtractProgress = 100
 		status.ExtractQueue = make([]SubredditExtractJob, 0)
+		status.ExtractTimeRem = ""
 	}
 
 	if len(processSubQueue) > 0 {
@@ -416,8 +421,6 @@ func handleExtractSubs(w http.ResponseWriter, r *http.Request) {
 		str += strconv.Itoa(i+1) + ". " + v.Year + "/" + v.Month + "\n"
 	}
 
-	//subredditStatuses[subreddit] = subredditStatus{}
-
 	if len(extractSubQueue) == 1 {
 		go extractQueue() //this is the main goroutine that will extract all the future jobs
 	}
@@ -425,6 +428,7 @@ func handleExtractSubs(w http.ResponseWriter, r *http.Request) {
 }
 
 var extractingProg float64
+var extractTimeRemaining string
 var processingProg float64
 
 func extractQueue() {
@@ -454,7 +458,7 @@ func extractQueue() {
 			criterias[i].Test = "subreddit"
 		}
 		summary := selection.ExtractCriteriaDataToFile(criterias, tempSub.Year, tempSub.Month,
-			DataDirectory, selection.BasicSchema, &extractingProg)
+			DataDirectory, selection.BasicSchema, &extractingProg, &extractTimeRemaining)
 
 		for i, sub := range tempSub.Subreddits {
 			v := subredditStatuses[sub]

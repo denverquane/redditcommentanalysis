@@ -81,7 +81,7 @@ func GetSentimentForString(url, text string) float64 {
 
 const percentPerMonth = (1.0 / 12.0) * 100.0
 
-func ExtractCriteriaDataToFile(criteria []Criteria, year, month, basedir string, schema commentSchema, progress *float64) []int {
+func ExtractCriteriaDataToFile(criteria []Criteria, year, month, basedir string, schema commentSchema, progress *float64, timeRem *string) []int {
 	var commentsInRawFile int64
 
 	filesystem.CreateSubdirectoryStructure(basedir, month, year)
@@ -169,8 +169,12 @@ func ExtractCriteriaDataToFile(criteria []Criteria, year, month, basedir string,
 				if commentsInRawFile != 0 {
 					*progress = (float64(linesRead) / float64(commentsInRawFile)) * 100.0
 					progressStr = strconv.FormatFloat(*progress, 'f', 2, 64) + "%"
+					oneKLinesRem := float64(commentsInRawFile-linesRead) / 100000.0
+					timeee := time.Duration(float64(time.Now().Sub(tempTime).Nanoseconds()) * oneKLinesRem)
+					*timeRem = timeee.Truncate(time.Second).String()
 				} else {
 					progressStr = strconv.FormatInt(linesRead, 10) + " lines total"
+
 				}
 				fmt.Println("Processed 100k lines in " + time.Now().Sub(tempTime).String() + " (" + progressStr + ")")
 				tempTime = time.Now()

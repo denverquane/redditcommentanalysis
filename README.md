@@ -24,22 +24,14 @@ very important.
 Structure:
 
     BASEDIR
-    -> 2010
-    -> 2011
+    -> RC_2015_01
+    -> RC_2016_01
+    -> RC_2016_02
     -> ...
-    -> 2016
-        -> Jan
-        -> Feb
-        -> ...
-        -> Dec
-            -> announcements_Basic
-            -> worldnews_Full
-            -> ...
-            -> <subreddit>_<schema>
-        -> RC_2016_01
-        -> RC_2016_02
-        -> ...
-        -> RC_2016_12
+    -> RC_2017_03
+
+The program will automatically generate "Extracted" and "Processed" directories to store the results of extracting and processing files,
+respectively
 
 RC_<year>_<month> files indicate the extracted data from https://www.reddit.com/r/datasets/comments/3bxlg7/i_have_every_publicly_available_reddit_comment/
 for each respective month/year

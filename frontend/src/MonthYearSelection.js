@@ -38,7 +38,7 @@ class MonthYearSelector extends React.Component {
   render() {
     let arr = [];
     for (let mo in Months) {
-      if (this.state.Months[Months[mo]]) {
+      if (this.state.Months[Months[mo]] !== undefined) {
         if (this.state.Months[Months[mo]] === -1) {
           arr.push(
             <Checkbox key={Months[mo]} disabled={true}>

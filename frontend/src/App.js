@@ -20,7 +20,7 @@ import PendingJobsViewer from "./PendingJobsViewer";
 
 import "@blueprintjs/core/lib/css/blueprint.css";
 
-let IP = "192.168.1.192";
+export const IP = "localhost";
 
 const AppToaster = Toaster.create({
   className: "notifyToaster",
@@ -85,6 +85,7 @@ class App extends Component {
     super();
     this.state.Websocket = false;
     this.getStatus();
+    this.getSubs();
   }
 
   render() {
@@ -95,23 +96,26 @@ class App extends Component {
           style={{ display: "flex", flexDirection: "row" }}
         >
           <div
-            style={{ width: "33%", display: "flex", flexDirection: "column" }}
+            style={{ width: "35%", display: "flex", flexDirection: "column" }}
           >
             Extraction Queue:
             {this.getLabels(this.state.Status.ExtractQueue)}
           </div>
-          <div style={{ width: "33%", display: "flex", flexDirection: "row" }}>
+          <div style={{ width: "30%", display: "flex", flexDirection: "row" }}>
             {this.state.Status.Extracting ? (
-              <div style={{ width: "20%", height: "20%" }}>
+              <div style={{ width: "30%", height: "20%" }}>
                 <Circle
                   strokeWidth="10"
                   percent={this.state.Status.ExtractProgress}
                 />
-                "{this.state.Status.ExtractQueue[0]["Subreddit"]}"{" "}
-                {this.state.Status.ExtractProgress.toFixed(3)}% Extracted
+                {this.state.Status.ExtractQueue[0]["Month"]}{" "}
+                {this.state.Status.ExtractQueue[0]["Year"]}{" "}
+                {this.state.Status.ExtractProgress ? 
+                    this.state.Status.ExtractProgress.toFixed(3) + '% Extracted ' : 'Extracting...'}
+                {this.state.Status.ExtractTimeRem ? '~' + this.state.Status.ExtractTimeRem + ' Remaining' : ''}
               </div>
             ) : (
-              <div style={{ width: "20%", height: "20%" }}>
+              <div style={{ width: "30%", height: "20%" }}>
                 <Circle
                   strokeWidth="10"
                   percent={this.state.Status.ExtractProgress}
@@ -120,7 +124,7 @@ class App extends Component {
               </div>
             )}
             {
-              <div style={{ width: "60%" }}>
+              <div style={{ width: "40%" }}>
                 <Spinner
                   intent={this.state.Websocket ? Intent.SUCCESS : Intent.DANGER}
                   value={
@@ -135,7 +139,7 @@ class App extends Component {
               </div>
             }
             {this.state.Status.Processing ? (
-              <div style={{ width: "20%", height: "20%" }}>
+              <div style={{ width: "30%", height: "20%" }}>
                 <Circle
                   strokeWidth="10"
                   percent={this.state.Status.ProcessProgress}
@@ -144,7 +148,7 @@ class App extends Component {
                 {this.state.Status.ProcessProgress.toFixed(3)}% Processed
               </div>
             ) : (
-              <div style={{ width: "20%", height: "20%" }}>
+              <div style={{ width: "30%", height: "20%" }}>
                 <Circle
                   strokeWidth="10"
                   percent={this.state.Status.ProcessProgress}
@@ -154,7 +158,7 @@ class App extends Component {
             )}
           </div>
           <div
-            style={{ width: "33%", display: "flex", flexDirection: "column" }}
+            style={{ width: "35%", display: "flex", flexDirection: "column" }}
           >
             Processing Queue:
             {this.getLabels(this.state.Status.ProcessQueue)}
@@ -286,25 +290,25 @@ class App extends Component {
       if (i === "0") {
         arr.push(
           <div>
-            <div style={{ width: "33%" }} />
+            <div style={{ width: "10%" }} />
             <Tag
               key={i}
               intent={Intent.SUCCESS}
-              style={{ width: "33%", marginBottom: "1%" }}
+              style={{ width: "80%", marginBottom: "1%" }}
             >
-              {i}. {queue[i]["Subreddit"]}{" "}
+              {i}. {queue[i]["Month"]}/{queue[i]["Year"]}{" "}{queue[i]["Subreddits"].join(',')}
             </Tag>
-            <div style={{ width: "33%" }} />
+            <div style={{ width: "10%" }} />
           </div>
         );
       } else {
         arr.push(
           <div>
-            <div style={{ width: "33%" }} />
-            <Tag key={i} intent={Intent.NONE} style={{ width: "33%" }}>
-              {i}. {queue[i]["Subreddit"]}
+            <div style={{ width: "10%" }} />
+            <Tag key={i} intent={Intent.NONE} style={{ width: "80%" }}>
+            {i}. {queue[i]["Month"]}/{queue[i]["Year"]}{" "}{queue[i]["Subreddits"].join(',')}
             </Tag>
-            <div style={{ width: "33%" }} />
+            <div style={{ width: "10%" }} />
           </div>
         );
       }
@@ -339,24 +343,6 @@ class App extends Component {
           intent: Intent.NONE
         });
         this.getStatus();
-      });
-  }
-  extractSubreddit(sub, month, year) {
-    fetch(
-      "http://" + IP + ":5000/api/extractSub/" + sub + "/" + month + "/" + year,
-      {
-        method: "post"
-      }
-    )
-      .then(results => {
-        return results;
-      })
-      .then(data => {
-        console.log(data);
-        AppToaster.show({
-          message: "Asked backend to extract: " + sub,
-          intent: Intent.NONE
-        });
       });
   }
 

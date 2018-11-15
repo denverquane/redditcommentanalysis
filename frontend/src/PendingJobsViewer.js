@@ -1,38 +1,49 @@
 import React from "react";
 import { connect } from "react-redux";
-import { Card, Intent } from "@blueprintjs/core";
+import { Card, Intent, Button } from "@blueprintjs/core";
+
+import {submitOrganizedJobs } from './reducer'
 
 class PendingJobsViewer extends React.Component {
   constructor(props) {
     super(props);
-    this.state = {};
+    this.state = {
+        organized: []
+    };
+  }
+
+  componentWillReceiveProps(props) {
+    let organized = [];
+    for (let joI in props.extractionJobs) {
+        let jo = props.extractionJobs[joI];
+        if (organized[jo.year]) {
+          if (organized[jo.year][jo.month]) {
+            organized[jo.year][jo.month].push(jo.subreddit);
+          } else {
+            organized[jo.year][jo.month] = [jo.subreddit];
+          }
+        } else {
+          organized[jo.year] = [];
+          organized[jo.year][jo.month] = [jo.subreddit];
+        }
+      }
+      this.setState({organized: organized})
   }
 
   render() {
     let jobs = [];
-    let organized = [];
+    
 
-    for (let joI in this.props.extractionJobs) {
-      let jo = this.props.extractionJobs[joI];
-      if (organized[jo.year]) {
-        if (organized[jo.year][jo.month]) {
-          organized[jo.year][jo.month].push(jo.subreddit);
-        } else {
-          organized[jo.year][jo.month] = [jo.subreddit];
-        }
-      } else {
-        organized[jo.year] = [];
-        organized[jo.year][jo.month] = [jo.subreddit];
-      }
-    }
-
-    for (let yrI in organized) {
-      jobs.push(this.renderYear(organized[yrI], yrI));
+    for (let yrI in this.state.organized) {
+      jobs.push(this.renderYear(this.state.organized[yrI], yrI));
     }
 
     return (
       <div>
         <h1>Pending Extraction Request</h1>
+        {jobs.length !== 0 ? <Button intent={Intent.SUCCESS} onClick={() => {
+            this.props.submitOrganizedJobs(this.state.organized)
+        }}>Submit </Button> : <div/> }
         {jobs}
       </div>
     );
@@ -78,6 +89,7 @@ const mapStateToProps = state => ({
 
 const mapDispatchToProps = dispatch => ({
   //addExtractionJob: (sub, mo, year) => dispatch(addExtractionJob(sub, mo, year))
+  submitOrganizedJobs: (organized) => dispatch(submitOrganizedJobs(organized))
 });
 
 export default connect(
