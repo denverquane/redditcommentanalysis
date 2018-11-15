@@ -21,3 +21,8 @@ type commentSchema struct {
 	name   string
 	schema map[string]string
 }
+
+type Criteria struct {
+	Test  string
+	Value string
+}

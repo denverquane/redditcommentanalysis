@@ -26,15 +26,21 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-type SubredditJob struct {
+type SubredditProcessJob struct {
 	Year      string
 	Month     string
 	Subreddit string
 }
 
+type SubredditExtractJob struct {
+	Year       string
+	Month      string
+	Subreddits []string
+}
+
 //TODO move this out of main!
-var extractSubQueue = make([]SubredditJob, 0)
-var processSubQueue = make([]SubredditJob, 0)
+var extractSubQueue = make([]SubredditExtractJob, 0)
+var processSubQueue = make([]SubredditProcessJob, 0)
 var subredditStatuses = make(map[string]subredditStatus)
 
 type subredditStatus struct {
@@ -115,7 +121,7 @@ func main() {
 		log.Fatal(run(ServerPort))
 	} else {
 		year := "2016"
-		subreddit := "funny"
+		subreddit := "photoshopbattles"
 		schema := "Basic"
 		//var prog float64
 		//_ = selection.SaveCriteriaDataToFile("Subreddit", "funny", "2016", os.Getenv("BASE_DATA_DIRECTORY"), selection.BasicSchema, &prog)
@@ -260,7 +266,7 @@ func makeMuxRouter() http.Handler {
 	muxRouter.HandleFunc("/api", handleIndex).Methods("GET")
 	muxRouter.HandleFunc("/api/status", handleStatus).Methods("GET", "OPTIONS")
 	muxRouter.HandleFunc("/api/subs", handleGetSubs).Methods("GET")
-	muxRouter.HandleFunc("/api/extractSub/{Subreddit}/{Month}/{Year}", handleExtractSub).Methods("POST")
+	muxRouter.HandleFunc("/api/extractSubs/{Month}/{Year}", handleExtractSubs).Methods("POST")
 	muxRouter.HandleFunc("/api/status/{Subreddit}", handleViewStatus).Methods("GET")
 	muxRouter.HandleFunc("/api/processSub/{Subreddit}/{Month}/{Year}", handleProcessSub).Methods("POST")
 	muxRouter.HandleFunc("/api/addSubEntry/{Subreddit}", addSubredditEntry).Methods("POST")
@@ -331,11 +337,11 @@ func handleMockStatus(w http.ResponseWriter, r *http.Request) {
 type ServerStatus struct {
 	Processing      bool
 	ProcessProgress float64
-	ProcessQueue    []SubredditJob
+	ProcessQueue    []SubredditProcessJob
 
 	Extracting      bool
 	ExtractProgress float64
-	ExtractQueue    []SubredditJob
+	ExtractQueue    []SubredditExtractJob
 }
 
 func handleStatus(w http.ResponseWriter, r *http.Request) {
@@ -347,7 +353,7 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 	} else {
 		status.Extracting = false
 		status.ExtractProgress = 100
-		status.ExtractQueue = make([]SubredditJob, 0)
+		status.ExtractQueue = make([]SubredditExtractJob, 0)
 	}
 
 	if len(processSubQueue) > 0 {
@@ -357,7 +363,7 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 	} else {
 		status.Processing = false
 		status.ProcessProgress = 100
-		status.ProcessQueue = make([]SubredditJob, 0)
+		status.ProcessQueue = make([]SubredditProcessJob, 0)
 	}
 	bytes, _ := json.Marshal(status)
 
@@ -388,25 +394,26 @@ func handleGetSubs(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, string(bytes))
 }
 
-func handleExtractSub(w http.ResponseWriter, r *http.Request) {
+func handleExtractSubs(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	subreddit := vars["Subreddit"]
 	month := vars["Month"]
 	year := vars["Year"]
 	writeStdHeaders(w)
-	//if _, ok := subredditStatuses[Subreddit]; ok {
-	//	// TODO fix this
-	//	//if val.Extracting || len(val.ExtractedMonthCommentCounts) != 0 {
-	//	//	io.WriteString(w, "Subreddit "+Subreddit+" has been extracted, is Extracting, or is in the queue for extraction!\n")
-	//	//	io.WriteString(w, val.ToString())
-	//	//}
-	//} else {
-	job := SubredditJob{Month: month, Year: year, Subreddit: subreddit}
+
+	decoder := json.NewDecoder(r.Body)
+
+	var data []string
+	err := decoder.Decode(&data)
+	if err != nil {
+		panic(err)
+	}
+
+	job := SubredditExtractJob{Month: month, Year: year, Subreddits: data}
 	extractSubQueue = append(extractSubQueue, job)
-	io.WriteString(w, subreddit+" in "+month+"/"+year+" appended to extraction queue!\nNew job queue:\n")
+	//io.WriteString(w, data+" in "+month+"/"+year+" appended to extraction queue!\nNew job queue:\n")
 	str := ""
 	for i, v := range extractSubQueue {
-		str += strconv.Itoa(i+1) + ". " + v.Subreddit + "\n"
+		str += strconv.Itoa(i+1) + ". " + v.Year + "/" + v.Month + "\n"
 	}
 
 	//subredditStatuses[subreddit] = subredditStatus{}
@@ -415,43 +422,57 @@ func handleExtractSub(w http.ResponseWriter, r *http.Request) {
 		go extractQueue() //this is the main goroutine that will extract all the future jobs
 	}
 	io.WriteString(w, str)
-	//}
 }
 
 var extractingProg float64
 var processingProg float64
 
 func extractQueue() {
-	var tempSub SubredditJob
+	var tempSub SubredditExtractJob
 	for len(extractSubQueue) > 0 {
 		tempSub = extractSubQueue[0]
-		if v, ok := subredditStatuses[tempSub.Subreddit]; !ok {
-			subredditStatuses[tempSub.Subreddit] = subredditStatus{Extracting: true,
-				ExtractedMonthCommentCounts: make(map[string]map[string]int64, 0), Processing: false, ProcessedSummary: selection.ProcessedSubredditStats{}}
-		} else {
-			v.Extracting = true
-			subredditStatuses[tempSub.Subreddit] = v
-			extractingProg = 0
+
+		for _, sub := range tempSub.Subreddits {
+			if v, ok := subredditStatuses[sub]; !ok {
+				subredditStatuses[sub] = subredditStatus{Extracting: true,
+					ExtractedMonthCommentCounts: make(map[string]map[string]int64, 0), Processing: false, ProcessedSummary: selection.ProcessedSubredditStats{}}
+			} else {
+				v.Extracting = true
+				subredditStatuses[sub] = v
+				extractingProg = 0
+			}
 		}
+
 		go monitorProgress(&extractingProg)
 
 		//TODO ensure that the Month/Year for extraction is present in the list of uncompressed data entries
-		summary := selection.ExtractCriteriaDataToFile("Subreddit", tempSub.Subreddit, tempSub.Year, tempSub.Month,
+
+		criterias := make([]selection.Criteria, len(tempSub.Subreddits))
+
+		for i, v := range tempSub.Subreddits {
+			criterias[i].Value = v
+			criterias[i].Test = "subreddit"
+		}
+		summary := selection.ExtractCriteriaDataToFile(criterias, tempSub.Year, tempSub.Month,
 			DataDirectory, selection.BasicSchema, &extractingProg)
 
-		v := subredditStatuses[tempSub.Subreddit]
-		v.Extracting = false
-		v.Extracted = true
-		if v.ExtractedMonthCommentCounts == nil {
-			v.ExtractedMonthCommentCounts = make(map[string]map[string]int64, 1)
+		for i, sub := range tempSub.Subreddits {
+			v := subredditStatuses[sub]
+			v.Extracting = false
+			v.Extracted = true
+			if v.ExtractedMonthCommentCounts == nil {
+				v.ExtractedMonthCommentCounts = make(map[string]map[string]int64, 1)
+			}
+			if v.ExtractedMonthCommentCounts[tempSub.Year] == nil {
+				v.ExtractedMonthCommentCounts[tempSub.Year] = make(map[string]int64, 1)
+			}
+			v.ExtractedMonthCommentCounts[tempSub.Year][tempSub.Month] = int64(summary[i])
+			subredditStatuses[sub] = v
 		}
-		if v.ExtractedMonthCommentCounts[tempSub.Year] == nil {
-			v.ExtractedMonthCommentCounts[tempSub.Year] = make(map[string]int64, 1)
-		}
-		v.ExtractedMonthCommentCounts[tempSub.Year][tempSub.Month] = summary
-		subredditStatuses[tempSub.Subreddit] = v
+
 		extractSubQueue = extractSubQueue[1:] //done
 		fmt.Println("COMPLETED")
+		checkForExtractedSubs(tempSub.Year, "Basic")
 		broadcast <- "fetch"
 	}
 }
@@ -471,7 +492,7 @@ func handleProcessSub(w http.ResponseWriter, r *http.Request) {
 		} else if val.Extracting {
 			io.WriteString(w, "Subreddit \""+subreddit+"\" is still being extracted")
 		} else {
-			job := SubredditJob{Month: month, Year: year, Subreddit: subreddit}
+			job := SubredditProcessJob{Month: month, Year: year, Subreddit: subreddit}
 			processSubQueue = append(processSubQueue, job)
 
 			io.WriteString(w, "{ "+subreddit+" appended to Processing queue!\nNew job queue:\n")
@@ -491,7 +512,7 @@ func handleProcessSub(w http.ResponseWriter, r *http.Request) {
 }
 
 func processQueue() {
-	var tempSub SubredditJob
+	var tempSub SubredditProcessJob
 	for len(processSubQueue) > 0 {
 		tempSub = processSubQueue[0]
 		if v, ok := subredditStatuses[tempSub.Subreddit]; !ok {

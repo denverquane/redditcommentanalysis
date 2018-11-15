@@ -1,28 +1,36 @@
 export const ADD_EXTRACT_JOB = 'events/ADD_EXTRACT_JOB';
-export const ADD_EXTRACT_JOB_SUCCESS = 'events/ADD_EXTRACT_JOB_SUCCESS';
-export const ADD_EXTRACT_JOB_FAIL = 'events/ADD_EXTRACT_JOB_FAIL';
 
-export default function reducer(state = { extractionJobs: [] }, action) {
+export default function reducer(state = [], action) {
   switch (action.type) {
     case ADD_EXTRACT_JOB:
-      return { ...state };
-    case ADD_EXTRACT_JOB_SUCCESS:
-      return { ...state, extractionJobs: [action.payload.job] };
-    case ADD_EXTRACT_JOB_FAIL:
-      return {
-        ...state,
-        error: 'Error while fetching events'
-      };
+      let newState = []
+      let found = false
+      for (let job in state) {
+        let j = state[job]
+        if (j.subreddit === action.subreddit && j.month === action.month && j.year === action.year){
+          found = true
+        } else {
+          newState.push(j)
+        }
+      }
+      if (!found) {
+        newState.push({
+          subreddit: action.subreddit,
+          month: action.month,
+          year: action.year
+        })
+      }
+      return newState
     default:
       return state;
   }
 }
 
-export function addExtractionJob(job) {
+export function addExtractionJob(subreddit, month, year) {
   return {
     type: ADD_EXTRACT_JOB,
-    payload: {
-      job: job
-    }
+    subreddit: subreddit,
+    month: month,
+    year: year
   };
 }
