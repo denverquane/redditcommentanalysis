@@ -12,7 +12,6 @@ import {
   Tag
 } from "@blueprintjs/core";
 import { Circle } from "rc-progress";
-// import { BarChart, Legend, XAxis, YAxis, Bar, CartesianGrid, Tooltip } from 'recharts'
 import Sockette from "sockette";
 import { CollapseExample } from "./Collapse";
 import MonthYearSelector from "./MonthYearSelection";
@@ -314,19 +313,6 @@ class App extends Component {
       }
     }
     return arr;
-  }
-
-  processButton(subreddit) {
-    return (
-      <div>
-        <Button
-          intent={Intent.WARNING}
-          onClick={() => this.processSubreddit(subreddit)}
-        >
-          Process {subreddit}
-        </Button>
-      </div>
-    );
   }
 
   processSubreddit(sub) {

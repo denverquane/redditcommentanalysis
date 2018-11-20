@@ -39,7 +39,7 @@ func getCommentDataFromLine(line []byte, keyTypes map[string]string) map[string]
 		if v == "str" {
 			if key == "body" {
 				result[key] = filter.ReplaceAllString(filterStopWordsFromString(strings.ToLower(fastjson.GetString(line, key))), "")
-				result["sentiment"] = strconv.FormatFloat(GetSentimentForString("http://192.168.1.192:8888", result[key]), 'f', 10, 64)
+				result["sentiment"] = strconv.FormatFloat(GetSentimentForString(os.Getenv("SENTIMENT_IP_AND_PORT"), result[key]), 'f', 10, 64)
 			} else {
 				result[key] = strings.ToLower(fastjson.GetString(line, key))
 			}

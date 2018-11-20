@@ -72,7 +72,7 @@ func OpenExtractedSubredditDatafile(basedir, month, year, subreddit, extractedTy
 		retSummary.KeywordCommentTallies[v.Word] = percent
 		fmt.Println(str)
 	}
-	*progress = 70
+	*progress = 75
 	fmt.Println("getting karmas")
 
 	for _, v := range tallies[:TotalTallyAndKarmaRecords] {
@@ -84,21 +84,26 @@ func OpenExtractedSubredditDatafile(basedir, month, year, subreddit, extractedTy
 			}
 		}
 	}
-	*progress = 80
+	*progress = 90
 	fmt.Println("getting sentiments")
 	var sentTotal = 0.0
-	for i, v := range commentData {
+	var totalRead = 0
+	for _, v := range commentData {
 		str := v["sentiment"]
 		if str == "" {
 			continue
 		}
-		if i%10000 == 0 {
-			fmt.Println("Finished with " + strconv.Itoa(i) + " of " + strconv.Itoa(lines) + " total")
+		f64, err := strconv.ParseFloat(str, 64)
+		if err != nil {
+			continue
 		}
-		f64, _ := strconv.ParseFloat(str, 64)
-		sentTotal += f64
+		if f64 != 0 {
+			sentTotal += f64
+			totalRead++
+		}
+
 	}
-	avgSent := sentTotal / float64(len(commentData))
+	avgSent := sentTotal / float64(totalRead)
 	fmt.Println("Subreddit " + subreddit + " avg sentiment: " + strconv.FormatFloat(avgSent, 'f', 10, 64))
 
 	*progress = 100
