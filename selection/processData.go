@@ -2,8 +2,10 @@ package selection
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/denverquane/redditcommentanalysis/filesystem"
 	"io/ioutil"
 	"log"
 	"os"
@@ -24,7 +26,7 @@ const TotalTallyAndKarmaRecords = 50
 type ProcessedSubredditStats struct {
 	KeywordCommentTallies map[string]float64 //How many comments contain the keyword
 	KeywordCommentKarmas  map[string]float64 //total karma for unique occurrences of the keyword
-	AverageSentiment float64
+	AverageSentiment      float64
 }
 
 func OpenExtractedSubredditDatafile(basedir, month, year, subreddit, extractedType string, progress *float64) ProcessedSubredditStats {
@@ -69,8 +71,8 @@ func OpenExtractedSubredditDatafile(basedir, month, year, subreddit, extractedTy
 	*progress = 60
 
 	fmt.Println("Tallying word and karma counts...")
-	tallies, karmas := tallyWordOccurrences(commentData)
-	for _, v := range tallies[:TotalTallyAndKarmaRecords] {
+	sortedTallies, sortedKarmas := tallyWordOccurrencesAndSort(commentData)
+	for _, v := range sortedTallies[:TotalTallyAndKarmaRecords] {
 		percent := (float64(v.TotalCount) / float64(len(commentData))) * 100.0
 		str := v.Word + ": " + strconv.FormatInt(v.TotalCount, 10) + " comment occurrences (" +
 			strconv.FormatFloat(percent, 'f', 3, 64) + "%)"
@@ -78,10 +80,10 @@ func OpenExtractedSubredditDatafile(basedir, month, year, subreddit, extractedTy
 		fmt.Println(str)
 	}
 	*progress = 75
-	fmt.Println("getting karmas")
+	fmt.Println("getting sortedKarmas")
 
-	for _, v := range tallies[:TotalTallyAndKarmaRecords] {
-		for _, karma := range karmas {
+	for _, v := range sortedTallies[:TotalTallyAndKarmaRecords] {
+		for _, karma := range sortedKarmas {
 			if karma.Word == v.Word {
 				str := karma.Word + ": " + strconv.FormatInt(karma.TotalKarma, 10) + " karma total"
 				retSummary.KeywordCommentKarmas[karma.Word] = float64(karma.TotalKarma) / float64(karma.TotalCount)
@@ -113,7 +115,48 @@ func OpenExtractedSubredditDatafile(basedir, month, year, subreddit, extractedTy
 	retSummary.AverageSentiment = avgSent
 
 	*progress = 100
+	DumpProcessedToCSV(basedir, month, year, subreddit, extractedType, retSummary)
 	return retSummary
+}
+
+func DumpProcessedToCSV(basedir, month, year, subreddit, extractedType string, processedStats ProcessedSubredditStats) {
+	//filesystem.CreateSubdirectoryStructure("Processed", basedir, month, year)
+	if !filesystem.DoesFolderExist(basedir + "/Processed") {
+		filesystem.CreateFolder(basedir + "/Processed")
+	}
+	if !filesystem.DoesFolderExist(basedir + "/Processed/" + year) {
+		filesystem.CreateFolder(basedir + "/Processed/" + year)
+	}
+	str := basedir + "/Processed/" + year + "/subreddit_" + subreddit + "_" + extractedType + ".csv"
+
+	var file *os.File
+	var err error
+
+	if filesystem.DoesFileExist(str) {
+		file, err = os.OpenFile(str, os.O_APPEND|os.O_WRONLY, 0600)
+		log.Println("Processed csv file already exists; appending to " + str)
+	} else {
+		file, err = os.Create(str)
+		log.Println("Making new file: " + str)
+	}
+
+	if err != nil {
+		log.Println(err)
+	}
+	defer file.Close()
+
+	var buffer bytes.Buffer
+	buffer.WriteString(subreddit + "," + month + ",")
+
+	buffer.WriteString("\"")
+	for word := range processedStats.KeywordCommentKarmas {
+		buffer.WriteString(word + ",")
+	}
+	buffer.WriteString("\",")
+	buffer.WriteString(strconv.FormatFloat(processedStats.AverageSentiment, 'f', 10, 64) + ",")
+	buffer.WriteString("\n")
+
+	file.Write(buffer.Bytes())
 }
 
 func sortKarma(karmaCounts map[string]IntPair) KarmaList {
@@ -165,7 +208,7 @@ func (p TallyList) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
 const MaxGoRoutines = 4
 
-func tallyWordOccurrences(comments []map[string]string) (TallyList, KarmaList) {
+func tallyWordOccurrencesAndSort(comments []map[string]string) (TallyList, KarmaList) {
 	tallies := make(map[string]IntPair)
 	var mux sync.Mutex
 

@@ -84,7 +84,7 @@ const percentPerMonth = (1.0 / 12.0) * 100.0
 func ExtractCriteriaDataToFile(criteria []Criteria, year, month, basedir string, schema commentSchema, progress *float64, timeRem *string) []int {
 	var commentsInRawFile int64
 
-	filesystem.CreateSubdirectoryStructure(basedir, month, year)
+	filesystem.CreateSubdirectoryStructure("Extracted", basedir, month, year)
 
 	outputFilePaths := make([]string, len(criteria))
 	outputFileWriters := make([]*os.File, len(criteria))
