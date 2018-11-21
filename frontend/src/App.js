@@ -195,6 +195,7 @@ class App extends Component {
       </div>
     );
   }
+
   displaySubs() {
     let arr = [];
     for (let key in this.state.Subs) {
@@ -202,24 +203,18 @@ class App extends Component {
       let totalComments = 0;
       let substatus = this.state.Subs[key];
 
-      for (let yr in substatus["ExtractedMonthCommentCounts"]) {
-        let months = [];
-        for (let month in substatus["ExtractedMonthCommentCounts"][yr]) {
-          months.push(
-            <div>
-              <h3>{month}</h3>
-              <p>{substatus["ExtractedMonthCommentCounts"][yr][month]}</p>
-            </div>
-          );
-          if (substatus["ExtractedMonthCommentCounts"][yr][month] !== -1) {
+      for (let yr in substatus["ExtractedYearMonthCommentCounts"]) {
+        for (let month in substatus["ExtractedYearMonthCommentCounts"][yr]) {
+          if (substatus["ExtractedYearMonthCommentCounts"][yr][month] !== -1) {
             totalComments +=
-              substatus["ExtractedMonthCommentCounts"][yr][month];
+              substatus["ExtractedYearMonthCommentCounts"][yr][month];
           }
         }
         years.push(
           <MonthYearSelector
             Year={yr}
-            Months={substatus["ExtractedMonthCommentCounts"][yr]}
+            Months={substatus["ExtractedYearMonthCommentCounts"][yr]}
+            Sentiments={substatus["ProcessedYearMonthCommentSummaries"][yr]}
             Subreddit={key}
           />
         );
@@ -300,7 +295,7 @@ class App extends Component {
             <div style={{ width: "10%" }} />
           </div>
         );
-      } else {
+      } else if (arr.length < 10){
         arr.push(
           <div>
             <div style={{ width: "10%" }} />
@@ -310,6 +305,14 @@ class App extends Component {
             <div style={{ width: "10%" }} />
           </div>
         );
+      } else if (i === "10"){
+        arr.push(<div>
+            <div style={{ width: "10%" }} />
+            <Tag key={i} intent={Intent.NONE} style={{ width: "80%" }}>
+            ...
+            </Tag>
+            <div style={{ width: "10%" }} />
+          </div>);
       }
     }
     return arr;

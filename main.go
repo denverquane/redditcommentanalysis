@@ -29,7 +29,7 @@ var upgrader = websocket.Upgrader{
 type SubredditProcessJob struct {
 	Year      string
 	Month     string
-	Subreddit string
+	Subreddits []string
 }
 
 type SubredditExtractJob struct {
@@ -44,13 +44,13 @@ var processSubQueue = make([]SubredditProcessJob, 0)
 var subredditStatuses = make(map[string]subredditStatus)
 
 type subredditStatus struct {
-	Extracting                  bool
-	Extracted                   bool
-	ExtractedMonthCommentCounts map[string]map[string]int64
+	Extracting                      bool
+	Extracted                       bool
+	ExtractedYearMonthCommentCounts map[string]map[string]int64
 
-	Processing       bool
-	Processed        bool
-	ProcessedSummary selection.ProcessedSubredditStats
+	Processing                         bool
+	Processed                          bool
+	ProcessedYearMonthCommentSummaries map[string]map[string]selection.ProcessedSubredditStats
 }
 
 var DataDirectory string
@@ -93,14 +93,14 @@ func main() {
 	for _, subredditStatus := range subredditStatuses {
 		for yearIdx, monthsAvailableArray := range YearsAndMonthsAvailable {
 			//Ensure all the available years are in the status
-			if _, ok := subredditStatus.ExtractedMonthCommentCounts[yearIdx]; !ok {
-				subredditStatus.ExtractedMonthCommentCounts[yearIdx] = make(map[string]int64, 0)
+			if _, ok := subredditStatus.ExtractedYearMonthCommentCounts[yearIdx]; !ok {
+				subredditStatus.ExtractedYearMonthCommentCounts[yearIdx] = make(map[string]int64, 0)
 			}
 
 			for _, month := range selection.AllMonths {
 				found := false
 				for _, monAvailable := range monthsAvailableArray {
-					if monthToShortIntString(monAvailable) == month {
+					if selection.MonthToShortIntString(monAvailable) == month {
 						found = true
 						break
 					}
@@ -108,14 +108,11 @@ func main() {
 
 				//the month isn't available
 				if !found {
-					subredditStatus.ExtractedMonthCommentCounts[yearIdx][month] = -1
+					subredditStatus.ExtractedYearMonthCommentCounts[yearIdx][month] = -1
 					//fmt.Println("Marked " + yearIdx + "/" + month + " as unavailable")
 				}
-
 			}
-
 		}
-
 	}
 
 	if RunServer == "true" {
@@ -129,37 +126,6 @@ func main() {
 		selection.OpenExtractedSubredditDatafile(DataDirectory, "Jan", year, subreddit, schema, &processingProg)
 		//scanDirForExtractedSubData(os.Getenv("BASE_DATA_DIRECTORY") + "/2016/Jan", "Basic")
 
-	}
-}
-func monthToShortIntString(month string) string {
-	switch month {
-	case "01":
-		return "Jan"
-	case "02":
-		return "Feb"
-	case "03":
-		return "Mar"
-	case "04":
-		return "Apr"
-	case "05":
-		return "May"
-	case "06":
-		return "Jun"
-	case "07":
-		return "Jul"
-	case "08":
-		return "Aug"
-	case "09":
-		return "Sep"
-	case "10":
-		return "Oct"
-	case "11":
-		return "Nov"
-	case "12":
-		return "Dec"
-	default:
-		log.Println("Invalid month supplied; defaulting to january")
-		return "01"
 	}
 }
 
@@ -231,15 +197,15 @@ func checkForExtractedSubs(year string, schema string) {
 			}
 
 			if val, ok := subredditStatuses[sub]; ok {
-				if val.ExtractedMonthCommentCounts[year] == nil {
-					val.ExtractedMonthCommentCounts[year] = make(map[string]int64, 1)
+				if val.ExtractedYearMonthCommentCounts[year] == nil {
+					val.ExtractedYearMonthCommentCounts[year] = make(map[string]int64, 1)
 				}
-				val.ExtractedMonthCommentCounts[year][month] = commentCount
+				val.ExtractedYearMonthCommentCounts[year][month] = commentCount
 				subredditStatuses[sub] = val
 			} else {
-				status := subredditStatus{Extracting: false, ExtractedMonthCommentCounts: make(map[string]map[string]int64, 1), Processing: false, ProcessedSummary: selection.ProcessedSubredditStats{}}
-				status.ExtractedMonthCommentCounts[year] = make(map[string]int64, 1)
-				status.ExtractedMonthCommentCounts[year][month] = commentCount
+				status := subredditStatus{Extracting: false, Extracted: true, ExtractedYearMonthCommentCounts: make(map[string]map[string]int64, 1), Processing: false,  ProcessedYearMonthCommentSummaries: make(map[string]map[string]selection.ProcessedSubredditStats, 0)}
+				status.ExtractedYearMonthCommentCounts[year] = make(map[string]int64, 1)
+				status.ExtractedYearMonthCommentCounts[year][month] = commentCount
 				subredditStatuses[sub] = status
 			}
 		}
@@ -249,7 +215,7 @@ func checkForExtractedSubs(year string, schema string) {
 func (status subredditStatus) ToString() string {
 	str := "Extracting: " + strconv.FormatBool(status.Extracting) + "\n"
 
-	if !status.Extracting && len(status.ExtractedMonthCommentCounts) != 0 {
+	if !status.Extracting && len(status.ExtractedYearMonthCommentCounts) != 0 {
 		str += "Extracted summary: " + "\n"
 	}
 
@@ -439,7 +405,7 @@ func extractQueue() {
 		for _, sub := range tempSub.Subreddits {
 			if v, ok := subredditStatuses[sub]; !ok {
 				subredditStatuses[sub] = subredditStatus{Extracting: true,
-					ExtractedMonthCommentCounts: make(map[string]map[string]int64, 0), Processing: false, ProcessedSummary: selection.ProcessedSubredditStats{}}
+					ExtractedYearMonthCommentCounts: make(map[string]map[string]int64, 0), Processing: false,  ProcessedYearMonthCommentSummaries: make(map[string]map[string]selection.ProcessedSubredditStats, 0)}
 			} else {
 				v.Extracting = true
 				subredditStatuses[sub] = v
@@ -464,13 +430,13 @@ func extractQueue() {
 			v := subredditStatuses[sub]
 			v.Extracting = false
 			v.Extracted = true
-			if v.ExtractedMonthCommentCounts == nil {
-				v.ExtractedMonthCommentCounts = make(map[string]map[string]int64, 1)
+			if v.ExtractedYearMonthCommentCounts == nil {
+				v.ExtractedYearMonthCommentCounts = make(map[string]map[string]int64, 1)
 			}
-			if v.ExtractedMonthCommentCounts[tempSub.Year] == nil {
-				v.ExtractedMonthCommentCounts[tempSub.Year] = make(map[string]int64, 1)
+			if v.ExtractedYearMonthCommentCounts[tempSub.Year] == nil {
+				v.ExtractedYearMonthCommentCounts[tempSub.Year] = make(map[string]int64, 1)
 			}
-			v.ExtractedMonthCommentCounts[tempSub.Year][tempSub.Month] = int64(summary[i])
+			v.ExtractedYearMonthCommentCounts[tempSub.Year][tempSub.Month] = int64(summary[i])
 			subredditStatuses[sub] = v
 		}
 
@@ -486,26 +452,34 @@ func handleProcessSub(w http.ResponseWriter, r *http.Request) {
 	subreddit := vars["Subreddit"]
 	month := vars["Month"]
 	year := vars["Year"]
+	override := false
 
 	writeStdHeaders(w)
 	if val, ok := subredditStatuses[subreddit]; ok {
-		if val.Processing {
-			io.WriteString(w, "Subreddit \""+subreddit+"\" is still being processed!")
-		} else if val.Processed {
-			io.WriteString(w, "Subreddit \""+subreddit+"\" has already been processed:\n")
-		} else if val.Extracting {
+		if val.Extracting {
 			io.WriteString(w, "Subreddit \""+subreddit+"\" is still being extracted")
 		} else {
-			job := SubredditProcessJob{Month: month, Year: year, Subreddit: subreddit}
-			processSubQueue = append(processSubQueue, job)
+			arr := make([]string, 1)
+			arr[0] = subreddit
+
+			if month == "ALL" {
+				override = true
+				for _, v := range selection.AllMonths {
+					job := SubredditProcessJob{Month: v, Year: year, Subreddits: arr}
+					processSubQueue = append(processSubQueue, job)
+				}
+			} else {
+				job := SubredditProcessJob{Month: month, Year: year, Subreddits: arr}
+				processSubQueue = append(processSubQueue, job)
+			}
 
 			io.WriteString(w, "{ "+subreddit+" appended to Processing queue!\nNew job queue:\n")
 			str := ""
 			for i, v := range processSubQueue {
-				str += strconv.Itoa(i+1) + ". " + v.Subreddit + "\n"
+				str += strconv.Itoa(i+1) + ". " + v.Month + "/" + v.Year + "\n"
 			}
 
-			if len(processSubQueue) == 1 {
+			if len(processSubQueue) == 1 || override {
 				go processQueue() //this is the main goroutine that will process all the future jobs
 			}
 			io.WriteString(w, str+"}")
@@ -519,22 +493,24 @@ func processQueue() {
 	var tempSub SubredditProcessJob
 	for len(processSubQueue) > 0 {
 		tempSub = processSubQueue[0]
-		if v, ok := subredditStatuses[tempSub.Subreddit]; !ok {
-			log.Fatal("Tried to process a sub not found in the registry!")
-		} else {
-			v.Processing = true
-			processingProg = 0
-			subredditStatuses[tempSub.Subreddit] = v
-		}
 
 		go monitorProgress(&processingProg)
-		sum := selection.OpenExtractedSubredditDatafile(DataDirectory, tempSub.Month, tempSub.Year, tempSub.Subreddit, "Basic", &processingProg)
 
-		v := subredditStatuses[tempSub.Subreddit]
-		v.Processing = false
-		v.Processed = true
-		v.ProcessedSummary = sum
-		subredditStatuses[tempSub.Subreddit] = v
+		for _, sub := range tempSub.Subreddits {
+			sum := selection.OpenExtractedSubredditDatafile(DataDirectory, tempSub.Month, tempSub.Year, sub, "Basic", &processingProg)
+			v := subredditStatuses[sub]
+			v.Processing = false
+			v.Processed = true
+			if v.ProcessedYearMonthCommentSummaries == nil {
+				v.ProcessedYearMonthCommentSummaries = make(map[string]map[string]selection.ProcessedSubredditStats, 1)
+			}
+			if v.ProcessedYearMonthCommentSummaries[tempSub.Year] == nil {
+				v.ProcessedYearMonthCommentSummaries[tempSub.Year] = make(map[string]selection.ProcessedSubredditStats, 1)
+			}
+			v.ProcessedYearMonthCommentSummaries[tempSub.Year][tempSub.Month] = sum
+			subredditStatuses[sub] = v
+		}
+
 		processSubQueue = processSubQueue[1:] //done
 		fmt.Println("COMPLETED")
 		broadcast <- "fetch"
@@ -560,17 +536,17 @@ func addSubredditEntry(w http.ResponseWriter, r *http.Request) {
 	subreddit := vars["Subreddit"]
 
 	if _, ok := subredditStatuses[subreddit]; !ok {
-		subredditStatuses[subreddit] = subredditStatus{Extracting: false, ExtractedMonthCommentCounts: make(map[string]map[string]int64, 0), Processing: false, ProcessedSummary: selection.ProcessedSubredditStats{}}
+		subredditStatuses[subreddit] = subredditStatus{Extracting: false, ExtractedYearMonthCommentCounts: make(map[string]map[string]int64, 0), Processing: false, ProcessedYearMonthCommentSummaries: make(map[string]map[string]selection.ProcessedSubredditStats, 0)}
 		for yearIdx, monthsAvailableArray := range YearsAndMonthsAvailable {
 			//Ensure all the available years are in the status
-			if _, ok := subredditStatuses[subreddit].ExtractedMonthCommentCounts[yearIdx]; !ok {
-				subredditStatuses[subreddit].ExtractedMonthCommentCounts[yearIdx] = make(map[string]int64, 0)
+			if _, ok := subredditStatuses[subreddit].ExtractedYearMonthCommentCounts[yearIdx]; !ok {
+				subredditStatuses[subreddit].ExtractedYearMonthCommentCounts[yearIdx] = make(map[string]int64, 0)
 			}
 
 			for _, month := range selection.AllMonths {
 				found := false
 				for _, monAvailable := range monthsAvailableArray {
-					if monthToShortIntString(monAvailable) == month {
+					if selection.MonthToShortIntString(monAvailable) == month {
 						found = true
 						break
 					}
@@ -578,7 +554,7 @@ func addSubredditEntry(w http.ResponseWriter, r *http.Request) {
 
 				//the month isn't available
 				if !found {
-					subredditStatuses[subreddit].ExtractedMonthCommentCounts[yearIdx][month] = -1
+					subredditStatuses[subreddit].ExtractedYearMonthCommentCounts[yearIdx][month] = -1
 					//fmt.Println("Marked " + yearIdx + "/" + month + " as unavailable")
 				}
 

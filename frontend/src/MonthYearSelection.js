@@ -4,6 +4,19 @@ import { connect } from "react-redux";
 
 import { addExtractionJob } from "./reducer";
 
+import {
+  AreaChart,
+  LineChart,
+  XAxis,
+  YAxis,
+  Line,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ReferenceLine,
+  Area
+} from "recharts";
+
 let Months = [
   "Jan",
   "Feb",
@@ -18,6 +31,20 @@ let Months = [
   "Nov",
   "Dec"
 ];
+let VerboseMonths = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December"
+]
 let state = [];
 
 class MonthYearSelector extends React.Component {
@@ -27,16 +54,27 @@ class MonthYearSelector extends React.Component {
       Months: props.Months,
       PendingJobs: state,
       Year: props.Year,
+      Sentiments: props.Sentiments,
       ExtractFunc: props.ExtractFunc
     };
   }
 
   componentWillUnmount() {
-    state = this.state.PendingJobs
+    state = this.state.PendingJobs;
+  }
+
+  componentWillReceiveProps(newProps) {
+    if (
+      newProps.Months !== this.state.Months ||
+      newProps.Sentiments !== this.state.Sentiments
+    ) {
+      this.forceUpdate();
+    }
   }
 
   render() {
     let arr = [];
+    let data = [];
     for (let mo in Months) {
       if (this.state.Months[Months[mo]] !== undefined) {
         if (this.state.Months[Months[mo]] === -1) {
@@ -51,6 +89,18 @@ class MonthYearSelector extends React.Component {
               {Months[mo]} : {this.state.Months[Months[mo]]} Comments
             </Checkbox>
           );
+          if (
+            this.state.Sentiments &&
+            this.state.Sentiments[Months[mo]] !== undefined
+          ) {
+            data.push({
+              Month: Months[mo],
+              Sentiment: this.state.Sentiments[Months[mo]]["AverageSentiment"],
+              Comments: this.state.Months[Months[mo]]
+            });
+          } else {
+            data.push({ Month: Months[mo], Sentiment: 0, Comments: this.state.Months[Months[mo]] });
+          }
         }
       } else {
         arr.push(
@@ -95,6 +145,28 @@ class MonthYearSelector extends React.Component {
             {arr.slice(8, 12)}
           </div>
         </div>
+        {this.state.Sentiments ? (
+          <AreaChart width={500} height={300} data={data}>
+            <XAxis dataKey="Month"/>
+            <YAxis dataKey="Sentiment" />
+            <CartesianGrid stroke="#eee" strokeDasharray="5 5" />
+            <Line type="monotone" dataKey="Sentiment" stroke="#8884d8" />
+            <ReferenceLine y={0.0} label="Neutral" stroke="blue"/>
+            <Area type="monotone" dataKey="Sentiment" stroke="#8884d8" fill="#8884d8"/>
+            <Legend verticalAlign="top"/>
+            <Tooltip />
+          </AreaChart>
+        ) : (
+          <div />
+        )}
+        <LineChart width={500} height={300} data={data}>
+          <XAxis dataKey="Month"/>
+          <YAxis dataKey="Comments" />
+          <CartesianGrid stroke="#eee" strokeDasharray="5 5" />
+          <Line type="monotone" dataKey="Comments" stroke="#8884d8" />
+          <Tooltip />
+          <Legend verticalAlign="top"/>
+        </LineChart>
         <Button
           onClick={() => {
             for (let mo in this.state.PendingJobs) {

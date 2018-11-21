@@ -24,14 +24,15 @@ const TotalTallyAndKarmaRecords = 50
 type ProcessedSubredditStats struct {
 	KeywordCommentTallies map[string]float64 //How many comments contain the keyword
 	KeywordCommentKarmas  map[string]float64 //total karma for unique occurrences of the keyword
+	AverageSentiment float64
 }
 
 func OpenExtractedSubredditDatafile(basedir, month, year, subreddit, extractedType string, progress *float64) ProcessedSubredditStats {
-	retSummary := ProcessedSubredditStats{make(map[string]float64, 0), make(map[string]float64)}
+	retSummary := ProcessedSubredditStats{make(map[string]float64, 0), make(map[string]float64), 0}
 	var commentData []map[string]string
 	str := basedir + "/Extracted/" + year + "/" + month + "/subreddit_" + subreddit + "_" + extractedType
 	fmt.Println("Opening " + str)
-
+	*progress = 0
 	extractedDataFile, fileOpenErr := os.Open(str)
 	if fileOpenErr != nil {
 		log.Fatal("failed to open " + str)
@@ -39,6 +40,10 @@ func OpenExtractedSubredditDatafile(basedir, month, year, subreddit, extractedTy
 	totalLines, err := LineCounter(extractedDataFile)
 	if err != nil {
 		log.Println(err)
+	}
+	if totalLines == 0 {
+		log.Println("File has 0 comments; can't process!")
+		return retSummary
 	}
 	extractedDataFile.Seek(0, 0)
 	extractedDataFileReader := bufio.NewReaderSize(extractedDataFile, 4096)
@@ -105,6 +110,7 @@ func OpenExtractedSubredditDatafile(basedir, month, year, subreddit, extractedTy
 	}
 	avgSent := sentTotal / float64(totalRead)
 	fmt.Println("Subreddit " + subreddit + " avg sentiment: " + strconv.FormatFloat(avgSent, 'f', 10, 64))
+	retSummary.AverageSentiment = avgSent
 
 	*progress = 100
 	return retSummary
