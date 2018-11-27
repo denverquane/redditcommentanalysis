@@ -27,8 +27,8 @@ var upgrader = websocket.Upgrader{
 }
 
 type SubredditProcessJob struct {
-	Year      string
-	Month     string
+	Year       string
+	Month      string
 	Subreddits []string
 }
 
@@ -203,7 +203,7 @@ func checkForExtractedSubs(year string, schema string) {
 				val.ExtractedYearMonthCommentCounts[year][month] = commentCount
 				subredditStatuses[sub] = val
 			} else {
-				status := subredditStatus{Extracting: false, Extracted: true, ExtractedYearMonthCommentCounts: make(map[string]map[string]int64, 1), Processing: false,  ProcessedYearMonthCommentSummaries: make(map[string]map[string]selection.ProcessedSubredditStats, 0)}
+				status := subredditStatus{Extracting: false, Extracted: true, ExtractedYearMonthCommentCounts: make(map[string]map[string]int64, 1), Processing: false, ProcessedYearMonthCommentSummaries: make(map[string]map[string]selection.ProcessedSubredditStats, 0)}
 				status.ExtractedYearMonthCommentCounts[year] = make(map[string]int64, 1)
 				status.ExtractedYearMonthCommentCounts[year][month] = commentCount
 				subredditStatuses[sub] = status
@@ -237,6 +237,7 @@ func makeMuxRouter() http.Handler {
 	muxRouter.HandleFunc("/api/extractSubs/{Month}/{Year}", handleExtractSubs).Methods("POST")
 	muxRouter.HandleFunc("/api/status/{Subreddit}", handleViewStatus).Methods("GET")
 	muxRouter.HandleFunc("/api/processSub/{Subreddit}/{Month}/{Year}", handleProcessSub).Methods("POST")
+	muxRouter.HandleFunc("/api/combineProcessed/{Year}", combineProcessed).Methods("POST")
 	muxRouter.HandleFunc("/api/addSubEntry/{Subreddit}", addSubredditEntry).Methods("POST")
 	muxRouter.HandleFunc("/api/mockStatus", handleMockStatus).Methods("GET")
 	muxRouter.HandleFunc("/ws", handleConnections)
@@ -405,7 +406,7 @@ func extractQueue() {
 		for _, sub := range tempSub.Subreddits {
 			if v, ok := subredditStatuses[sub]; !ok {
 				subredditStatuses[sub] = subredditStatus{Extracting: true,
-					ExtractedYearMonthCommentCounts: make(map[string]map[string]int64, 0), Processing: false,  ProcessedYearMonthCommentSummaries: make(map[string]map[string]selection.ProcessedSubredditStats, 0)}
+					ExtractedYearMonthCommentCounts: make(map[string]map[string]int64, 0), Processing: false, ProcessedYearMonthCommentSummaries: make(map[string]map[string]selection.ProcessedSubredditStats, 0)}
 			} else {
 				v.Extracting = true
 				subredditStatuses[sub] = v
@@ -577,6 +578,14 @@ func handleViewStatus(w http.ResponseWriter, r *http.Request) {
 		data, _ := json.Marshal(val)
 		io.WriteString(w, string(data))
 	}
+}
+
+func combineProcessed(w http.ResponseWriter, r *http.Request) {
+	writeStdHeaders(w)
+	vars := mux.Vars(r)
+	year := vars["Year"]
+
+	selection.CombineAllToSingleCSV(DataDirectory, year, "Basic")
 }
 
 func writeStdHeaders(w http.ResponseWriter) {
