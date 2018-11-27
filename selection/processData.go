@@ -159,6 +159,47 @@ func DumpProcessedToCSV(basedir, month, year, subreddit, extractedType string, p
 	file.Write(buffer.Bytes())
 }
 
+func CombineAllToSingleCSV(basedir, year, extractedType string) {
+	str := basedir + "/Processed/" + year + "/"
+
+	f, err := os.Open(str)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	files, err := f.Readdir(-1)
+	f.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	output, err2 := os.Create(str + "Summary.csv")
+	if err2 != nil {
+		log.Fatal(err2)
+	}
+	defer output.Close()
+
+	for _, v := range files {
+		if !v.IsDir() && strings.HasSuffix(v.Name(), ".csv") && strings.HasPrefix(v.Name(), "subreddit_") {
+			csv, err := os.Open(str + v.Name())
+			if err != nil {
+				log.Println(err)
+			}
+			rawDataFileReader := bufio.NewReaderSize(csv, 4096)
+
+			for {
+				line := recurseBuildCompleteLine(rawDataFileReader)
+				if line == nil {
+					break
+				} else {
+					output.WriteString(string(line) + "\n")
+				}
+			}
+			csv.Close()
+		}
+	}
+}
+
 func sortKarma(karmaCounts map[string]IntPair) KarmaList {
 	pl := make(KarmaList, len(karmaCounts))
 	i := 0
