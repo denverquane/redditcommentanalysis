@@ -1,5 +1,11 @@
 from flask import Flask, render_template, flash, redirect, request
+import Orange
 app = Flask(__name__)
+data = Orange.data.Table('../data/2016_Summary.csv')
+learner = Orange.classification.CN2Learner()
+classifier = learner(data)
+res = Orange.evaluation.CrossValidation(data, [learner], k=5)
+print("Accuracy:", Orange.evaluation.scoring.CA(res))
 
 @app.route('/', methods=['GET', 'POST'])
 def prediction():
@@ -7,6 +13,7 @@ def prediction():
         jsonFile = request.files['file']
         # This is where we'd actually process the file, for now
         # we're just printing the lines of the file
+        
         for line in jsonFile:
             print(line)
         return '''
