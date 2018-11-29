@@ -12,8 +12,12 @@ var commentFields = map[string]string{
 	"score":     "int",
 }
 
-var BasicSchema = commentSchema{
-	name:   "Basic",
+//var BasicSchema = commentSchema{
+//	name:   "Basic",
+//	schema: commentFields,
+//}
+var BetterSchema = commentSchema{
+	name:   "Better",
 	schema: commentFields,
 }
 

@@ -54,7 +54,6 @@ type subredditStatus struct {
 }
 
 var DataDirectory string
-var RunServer string
 var ServerPort string
 var YearsAndMonthsAvailable map[string][]string
 
@@ -72,7 +71,6 @@ func main() {
 		log.Fatal("Error loading .env file")
 	} else {
 		DataDirectory = os.Getenv("BASE_DATA_DIRECTORY")
-		RunServer = os.Getenv("RUN_SERVER")
 		ServerPort = os.Getenv("SERVER_PORT")
 	}
 
@@ -87,7 +85,7 @@ func main() {
 
 	for yr := range YearsAndMonthsAvailable {
 		//fmt.Println("Checking " + yr)
-		checkForExtractedSubs(yr, "Basic")
+		checkForExtractedSubs(yr, "Better")
 	}
 
 	for _, subredditStatus := range subredditStatuses {
@@ -115,18 +113,7 @@ func main() {
 		}
 	}
 
-	if RunServer == "true" {
-		log.Fatal(run(ServerPort))
-	} else {
-		year := "2016"
-		subreddit := "photoshopbattles"
-		schema := "Basic"
-		//var prog float64
-		//_ = selection.SaveCriteriaDataToFile("Subreddit", "funny", "2016", os.Getenv("BASE_DATA_DIRECTORY"), selection.BasicSchema, &prog)
-		selection.OpenExtractedSubredditDatafile(DataDirectory, "Jan", year, subreddit, schema, &processingProg)
-		//scanDirForExtractedSubData(os.Getenv("BASE_DATA_DIRECTORY") + "/2016/Jan", "Basic")
-
-	}
+	log.Fatal(run(ServerPort))
 }
 
 func run(port string) error {
@@ -377,6 +364,7 @@ func handleExtractSubs(w http.ResponseWriter, r *http.Request) {
 	var data []string
 	err := decoder.Decode(&data)
 	if err != nil {
+		fmt.Println("Error dsec")
 		panic(err)
 	}
 
@@ -425,7 +413,7 @@ func extractQueue() {
 			criterias[i].Test = "subreddit"
 		}
 		summary := selection.ExtractCriteriaDataToFile(criterias, tempSub.Year, tempSub.Month,
-			DataDirectory, selection.BasicSchema, &extractingProg, &extractTimeRemaining)
+			DataDirectory, selection.BetterSchema, &extractingProg, &extractTimeRemaining)
 
 		for i, sub := range tempSub.Subreddits {
 			v := subredditStatuses[sub]
@@ -443,7 +431,7 @@ func extractQueue() {
 
 		extractSubQueue = extractSubQueue[1:] //done
 		fmt.Println("COMPLETED")
-		checkForExtractedSubs(tempSub.Year, "Basic")
+		checkForExtractedSubs(tempSub.Year, "Better")
 		broadcast <- "fetch"
 	}
 }
@@ -501,7 +489,7 @@ func processQueue() {
 		go monitorProgress(&processingProg)
 
 		for _, sub := range tempSub.Subreddits {
-			sum := selection.OpenExtractedSubredditDatafile(DataDirectory, tempSub.Month, tempSub.Year, sub, "Basic", &processingProg)
+			sum := selection.OpenExtractedSubredditDatafile(DataDirectory, tempSub.Month, tempSub.Year, sub, "Better", &processingProg)
 			v := subredditStatuses[sub]
 			v.Processing = false
 			v.Processed = true
