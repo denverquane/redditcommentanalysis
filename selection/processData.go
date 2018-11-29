@@ -67,12 +67,19 @@ func OpenExtractedSubredditDatafile(basedir, month, year, subreddit, extractedTy
 		*progress = 50.0 * (float64(lines) / float64(totalLines))
 	}
 
+	//TODO Get the X most common (or most karma) words in a given month across ALL comments
+	//TODO Indicate the % of comments that contain (word x) for the subreddit in that month for all X words
+
 	fmt.Println(strconv.Itoa(len(commentData)) + " total comments")
 	*progress = 60
 
 	fmt.Println("Tallying word and karma counts...")
 	sortedTallies, sortedKarmas := tallyWordOccurrencesAndSort(commentData)
-	for _, v := range sortedTallies[:TotalTallyAndKarmaRecords] {
+	maxSelect := len(sortedTallies)
+	if maxSelect > TotalTallyAndKarmaRecords {
+		maxSelect = TotalTallyAndKarmaRecords
+	}
+	for _, v := range sortedTallies[:maxSelect] {
 		percent := (float64(v.TotalCount) / float64(len(commentData))) * 100.0
 		str := v.Word + ": " + strconv.FormatInt(v.TotalCount, 10) + " comment occurrences (" +
 			strconv.FormatFloat(percent, 'f', 3, 64) + "%)"
@@ -82,7 +89,7 @@ func OpenExtractedSubredditDatafile(basedir, month, year, subreddit, extractedTy
 	*progress = 75
 	fmt.Println("getting sortedKarmas")
 
-	for _, v := range sortedTallies[:TotalTallyAndKarmaRecords] {
+	for _, v := range sortedTallies[:maxSelect] {
 		for _, karma := range sortedKarmas {
 			if karma.Word == v.Word {
 				str := karma.Word + ": " + strconv.FormatInt(karma.TotalKarma, 10) + " karma total"
@@ -115,11 +122,11 @@ func OpenExtractedSubredditDatafile(basedir, month, year, subreddit, extractedTy
 	retSummary.AverageSentiment = avgSent
 
 	*progress = 100
-	DumpProcessedToCSV(basedir, month, year, subreddit, extractedType, retSummary)
+	DumpProcessedToCSV(basedir, month, year, subreddit, retSummary)
 	return retSummary
 }
 
-func DumpProcessedToCSV(basedir, month, year, subreddit, extractedType string, processedStats ProcessedSubredditStats) {
+func DumpProcessedToCSV(basedir, month, year, subreddit string, processedStats ProcessedSubredditStats) {
 	//filesystem.CreateSubdirectoryStructure("Processed", basedir, month, year)
 	if !filesystem.DoesFolderExist(basedir + "/Processed") {
 		filesystem.CreateFolder(basedir + "/Processed")
@@ -127,77 +134,60 @@ func DumpProcessedToCSV(basedir, month, year, subreddit, extractedType string, p
 	if !filesystem.DoesFolderExist(basedir + "/Processed/" + year) {
 		filesystem.CreateFolder(basedir + "/Processed/" + year)
 	}
-	str := basedir + "/Processed/" + year + "/subreddit_" + subreddit + "_" + extractedType + ".csv"
+	keywordNumber := len(processedStats.KeywordCommentKarmas)
+
+	str := basedir + "/Processed/" + year + "/" + year + "_" + strconv.Itoa(keywordNumber) + "_words_Summary.csv"
 
 	var file *os.File
 	var err error
 
 	if filesystem.DoesFileExist(str) {
-		file, err = os.OpenFile(str, os.O_APPEND|os.O_WRONLY, 0600)
-		log.Println("Processed csv file already exists; appending to " + str)
+		file, err = os.OpenFile(str, os.O_RDWR|os.O_APPEND, 0660)
+		if err != nil {
+			log.Println(err)
+		}
+		fileReader := bufio.NewReaderSize(file, 4096)
+
+		for {
+			line := recurseBuildCompleteLine(fileReader)
+			if line == nil {
+				break
+			} else {
+				entries := strings.Split(string(line), ",")
+				if entries[0] == subreddit && entries[1] == month {
+					log.Println("Processed sub data already in file, exiting!")
+					file.Close()
+					return
+				}
+			}
+		}
 	} else {
 		file, err = os.Create(str)
+		if err != nil {
+			log.Println(err)
+		}
 		log.Println("Making new file: " + str)
-	}
 
-	if err != nil {
-		log.Println(err)
+		var header bytes.Buffer
+		header.WriteString("cD#subreddit,")
+		header.WriteString("iS#month,")
+		for i := 0; i < keywordNumber; i++ {
+			header.WriteString("mS# keyword" + strconv.Itoa(i) + ",")
+		}
+		header.WriteString("mC#sentiment\n")
+		file.Write(header.Bytes())
 	}
-	defer file.Close()
-
 	var buffer bytes.Buffer
 	buffer.WriteString(subreddit + "," + month + ",")
 
-	buffer.WriteString("\"")
 	for word := range processedStats.KeywordCommentKarmas {
 		buffer.WriteString(word + ",")
 	}
-	buffer.WriteString("\",")
 	buffer.WriteString(strconv.FormatFloat(processedStats.AverageSentiment, 'f', 10, 64) + ",")
 	buffer.WriteString("\n")
 
 	file.Write(buffer.Bytes())
-}
-
-func CombineAllToSingleCSV(basedir, year, extractedType string) {
-	str := basedir + "/Processed/" + year + "/"
-
-	f, err := os.Open(str)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	files, err := f.Readdir(-1)
-	f.Close()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	output, err2 := os.Create(str + "Summary.csv")
-	if err2 != nil {
-		log.Fatal(err2)
-	}
-	defer output.Close()
-
-	for _, v := range files {
-		if !v.IsDir() && strings.HasSuffix(v.Name(), ".csv") && strings.HasPrefix(v.Name(), "subreddit_") {
-			csv, err := os.Open(str + v.Name())
-			if err != nil {
-				log.Println(err)
-			}
-			rawDataFileReader := bufio.NewReaderSize(csv, 4096)
-
-			for {
-				line := recurseBuildCompleteLine(rawDataFileReader)
-				if line == nil {
-					break
-				} else {
-					output.WriteString(string(line) + "\n")
-				}
-			}
-			csv.Close()
-		}
-	}
+	file.Close()
 }
 
 func sortKarma(karmaCounts map[string]IntPair) KarmaList {

@@ -237,7 +237,7 @@ func makeMuxRouter() http.Handler {
 	muxRouter.HandleFunc("/api/extractSubs/{Month}/{Year}", handleExtractSubs).Methods("POST")
 	muxRouter.HandleFunc("/api/status/{Subreddit}", handleViewStatus).Methods("GET")
 	muxRouter.HandleFunc("/api/processSub/{Subreddit}/{Month}/{Year}", handleProcessSub).Methods("POST")
-	muxRouter.HandleFunc("/api/combineProcessed/{Year}", combineProcessed).Methods("POST")
+	//muxRouter.HandleFunc("/api/combineProcessed/{Year}", combineProcessed).Methods("POST")
 	muxRouter.HandleFunc("/api/addSubEntry/{Subreddit}", addSubredditEntry).Methods("POST")
 	muxRouter.HandleFunc("/api/mockStatus", handleMockStatus).Methods("GET")
 	muxRouter.HandleFunc("/ws", handleConnections)
@@ -464,7 +464,9 @@ func handleProcessSub(w http.ResponseWriter, r *http.Request) {
 			arr[0] = subreddit
 
 			if month == "ALL" {
-				override = true
+				if len(processSubQueue) == 0 {
+					override = true
+				}
 				for _, v := range selection.AllMonths {
 					job := SubredditProcessJob{Month: v, Year: year, Subreddits: arr}
 					processSubQueue = append(processSubQueue, job)
@@ -492,6 +494,7 @@ func handleProcessSub(w http.ResponseWriter, r *http.Request) {
 
 func processQueue() {
 	var tempSub SubredditProcessJob
+	log.Println("Started new process worker!")
 	for len(processSubQueue) > 0 {
 		tempSub = processSubQueue[0]
 
@@ -580,13 +583,13 @@ func handleViewStatus(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func combineProcessed(w http.ResponseWriter, r *http.Request) {
-	writeStdHeaders(w)
-	vars := mux.Vars(r)
-	year := vars["Year"]
-
-	selection.CombineAllToSingleCSV(DataDirectory, year, "Basic")
-}
+//func combineProcessed(w http.ResponseWriter, r *http.Request) {
+//	writeStdHeaders(w)
+//	vars := mux.Vars(r)
+//	year := vars["Year"]
+//
+//	selection.CombineAllToSingleCSV(DataDirectory, year, "Basic")
+//}
 
 func writeStdHeaders(w http.ResponseWriter) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
