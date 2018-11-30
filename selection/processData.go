@@ -145,9 +145,9 @@ func DumpProcessedToCSV(basedir, month, year, subreddit string, processedStats P
 	//for word := range processedStats.KeywordCommentKarmas {
 	//	buffer.WriteString(word + ",")
 	//}
-	buffer.WriteString(strconv.FormatFloat(processedStats.WordLength.Median, 'f', 10, 64) + ",")
-	buffer.WriteString(strconv.FormatFloat(processedStats.Karma.Median, 'f', 10, 64) + ",")
-	buffer.WriteString(strconv.FormatFloat(processedStats.Sentiment.Median, 'f', 10, 64) + ",")
+	buffer.WriteString(strconv.FormatFloat(processedStats.WordLength.Average, 'f', 10, 64) + ",")
+	buffer.WriteString(strconv.FormatFloat(processedStats.Karma.Average, 'f', 10, 64) + ",")
+	buffer.WriteString(strconv.FormatFloat(processedStats.Sentiment.Average, 'f', 10, 64) + ",")
 	buffer.WriteString("\n")
 
 	file.Write(buffer.Bytes())

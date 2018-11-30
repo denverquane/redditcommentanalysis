@@ -6,14 +6,16 @@ type BoxPlotStatistics struct {
 	Min           float64
 	Max           float64
 	Median        float64
+	Average       float64
 	ThirdQuartile float64
 	FirstQuartile float64
 }
 
 func GetBoxPlotStats(data []float64) BoxPlotStatistics {
 	median := Median(data)
+	avg := Average(data)
 	stdDev := StdDev(data)
-	return BoxPlotStatistics{Min(data), Max(data), median, median + stdDev, median - stdDev}
+	return BoxPlotStatistics{Min(data), Max(data), median, avg, median + stdDev, median - stdDev}
 }
 
 func Average(floats []float64) float64 {
