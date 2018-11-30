@@ -41,6 +41,7 @@ class PendingJobsViewer extends React.Component {
     return (
       <div>
         <h1>Pending Extraction Request</h1>
+        <h1>{this.props.selectedSubreddit}</h1>
         {jobs.length !== 0 ? <Button intent={Intent.SUCCESS} onClick={() => {
             this.props.submitOrganizedJobs(this.state.organized)
         }}>Submit </Button> : <div/> }
@@ -84,7 +85,8 @@ class PendingJobsViewer extends React.Component {
 }
 
 const mapStateToProps = state => ({
-  extractionJobs: state
+  extractionJobs: state.extractionQueue,
+  selectedSubreddit: state.selectedSubreddit
 });
 
 const mapDispatchToProps = dispatch => ({

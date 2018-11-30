@@ -13,11 +13,14 @@ import {
 } from "@blueprintjs/core";
 import { Circle } from "rc-progress";
 import Sockette from "sockette";
+import { connect } from "react-redux";
 import { CollapseExample } from "./Collapse";
 import MonthYearSelector from "./MonthYearSelection";
 import PendingJobsViewer from "./PendingJobsViewer";
 
 import "@blueprintjs/core/lib/css/blueprint.css";
+
+import { setSelectedSubreddit, fetchSubreddits } from "./reducer";
 
 export const IP = "localhost";
 
@@ -36,7 +39,7 @@ class App extends Component {
         message: "Connected to Backend!",
         intent: Intent.SUCCESS
       });
-      this.getSubs();
+      this.props.fetchSubreddits();
       this.getStatus();
       this.setState({ ...this.state, Websocket: true });
     },
@@ -44,7 +47,7 @@ class App extends Component {
       console.log("Received:", e);
       console.log(String(e.data));
       if (String(e.data).includes("fetch")) {
-        this.getSubs();
+        this.props.fetchSubreddits();
         this.getStatus();
         console.log("Fetch message");
       } else if (String(e.data).includes("status")) {
@@ -76,7 +79,6 @@ class App extends Component {
   });
   state = {
     Websocket: Boolean,
-    Subs: Object,
     Status: Object,
     TempExtractName: String
   };
@@ -84,7 +86,10 @@ class App extends Component {
     super();
     this.state.Websocket = false;
     this.getStatus();
-    this.getSubs();
+  }
+
+  componentDidMount() {
+    this.props.fetchSubreddits();
   }
 
   render() {
@@ -198,10 +203,11 @@ class App extends Component {
 
   displaySubs() {
     let arr = [];
-    for (let key in this.state.Subs) {
+    console.log(this.props.subreddits);
+    for (let key in this.props.subreddits) {
       let years = [];
       let totalComments = 0;
-      let substatus = this.state.Subs[key];
+      let substatus = this.props.subreddits[key];
 
       for (let yr in substatus["ExtractedYearMonthCommentCounts"]) {
         for (let month in substatus["ExtractedYearMonthCommentCounts"][yr]) {
@@ -221,6 +227,7 @@ class App extends Component {
       }
       arr.push(
         <Card
+          onClick={() => {this.props.setSelectedSubreddit(key)}}
           key={key}
           style={{
             display: "flex",
@@ -248,19 +255,6 @@ class App extends Component {
       return 0;
     });
     return arr;
-  }
-
-  getSubs() {
-    fetch("http://" + IP + ":5000/api/subs")
-      .then(results => {
-        return results.json();
-      })
-      .then(data => {
-        if (JSON.stringify(this.state.Subs) !== JSON.stringify(data)) {
-          // console.log('Updated');
-          this.setState({ ...this.state, Subs: data });
-        }
-      });
   }
 
   getStatus() {
@@ -343,9 +337,22 @@ class App extends Component {
         return results;
       })
       .then(data => {
-        this.getSubs();
+        this.props.fetchSubreddits();
       });
   }
 }
 
-export default App;
+const mapStateToProps = state => ({
+  selectedSubreddit: state.selectedSubreddit,
+  subreddits: state.subreddits
+});
+
+const mapDispatchToProps = dispatch => ({
+  setSelectedSubreddit: (sub) => dispatch(setSelectedSubreddit(sub)),
+  fetchSubreddits: () => dispatch(fetchSubreddits())
+});
+
+export default connect(
+  mapStateToProps,
+  mapDispatchToProps
+)(App);
