@@ -1,23 +1,30 @@
-import { IP } from './App'
+import { IP } from "./index";
 
-export const ADD_EXTRACT_JOB = 'events/ADD_EXTRACT_JOB';
-export const SUBMIT_ORGANIZED_JOBS = 'events/SUBMIT_ORGANIZED_JOBS'
-export const SET_SELECTED_SUBREDDIT = 'events/SET_SELECTED_SUBREDDIT'
-export const GET_SUBREDDITS = 'events/GET_SUBREDDITS'
-export const RECEIVE_SUBREDDITS = 'events/RECEIVE_SUBREDDITS'
+export const ADD_EXTRACT_JOB = "events/ADD_EXTRACT_JOB";
+export const SET_SELECTED_SUBREDDIT = "events/SET_SELECTED_SUBREDDIT";
+export const GET_SUBREDDITS = "events/GET_SUBREDDITS";
+export const GET_SUBREDDITS_SUCCESS = "events/GET_SUBREDDITS_SUCCESS";
+
+export const POST_EXTRACT_SUBREDDITS = "events/POST_EXTRACT_SUBREDDITS";
+export const POST_EXTRACT_SUBREDDITS_SUCCESS =
+  "events/POST_EXTRACT_SUBREDDITS_SUCCESS";
 
 export default function reducer(state = [], action) {
   switch (action.type) {
     case ADD_EXTRACT_JOB:
-      let newState = {}
+      let newState = JSON.parse(JSON.stringify(state));
       newState.extractionQueue = [];
-      let found = false
+      let found = false;
       for (let job in state.extractionQueue) {
-        let j = state.extractionQueue[job]
-        if (j.subreddit === action.subreddit && j.month === action.month && j.year === action.year){
-          found = true
+        let j = state.extractionQueue[job];
+        if (
+          j.subreddit === action.subreddit &&
+          j.month === action.month &&
+          j.year === action.year
+        ) {
+          found = true;
         } else {
-          newState.extractionQueue.push(j)
+          newState.extractionQueue.push(j);
         }
       }
 
@@ -26,63 +33,43 @@ export default function reducer(state = [], action) {
           subreddit: action.subreddit,
           month: action.month,
           year: action.year
-        })
+        });
       }
-      return newState
+      return newState;
 
-    case SUBMIT_ORGANIZED_JOBS: 
-      for (let yrIdx in action.organized){
-        for (let moIdx in action.organized[yrIdx]){
-          let subs = action.organized[yrIdx][moIdx]
-
-          extractSubreddits(subs, moIdx, yrIdx)
-        }
-      }
-      return []
-    
     case SET_SELECTED_SUBREDDIT:
       return {
         ...state,
         selectedSubreddit: action.subreddit
-      }
+      };
 
     case GET_SUBREDDITS:
-      let subs;
-      fetch("http://" + IP + ":5000/api/subs")
-        .then(results => {
-          return results.json();
-        })
-        .then(data => {
-            subs = data;
-        });
       return {
-        ...state, 
-        subreddits: subs
-      }
-    case RECEIVE_SUBREDDITS:
+        ...state,
+        loadingSubs: true
+      };
+    case GET_SUBREDDITS_SUCCESS:
       return {
-        ...state, 
-        subreddits: action.subreddits
+        ...state,
+        loadingSubs: false,
+        subreddits: action.payload.data
+      };
+    case POST_EXTRACT_SUBREDDITS: 
+      return {
+        ...state,
+        postingExtract: true
       }
+
+    case POST_EXTRACT_SUBREDDITS_SUCCESS: 
+      return {
+        ...state,
+        postingExtract: false,
+        extractionQueue: []
+      }
+
     default:
       return state;
   }
-}
-
-function extractSubreddits(subs, month, year) {
-  fetch(
-    "http://" + IP + ":5000/api/extractSubs/" + month + "/" + year,
-    {
-      method: "post",
-      body: JSON.stringify(subs)
-    }
-  )
-    .then(results => {
-      return results;
-    })
-    .then(data => {
-      console.log(data);
-    });
 }
 
 export function addExtractionJob(subreddit, month, year) {
@@ -98,18 +85,29 @@ export function setSelectedSubreddit(subreddit) {
   return {
     type: SET_SELECTED_SUBREDDIT,
     subreddit: subreddit
-  }
+  };
 }
 
 export function fetchSubreddits() {
   return {
-    type: GET_SUBREDDITS
-  }
+    type: GET_SUBREDDITS,
+    payload: {
+      request: {
+        url: "/subs"
+      }
+    }
+  };
 }
 
-export function submitOrganizedJobs(organized) {
+export function postExtractSubreddits(subs, month, year) {
   return {
-    type: SUBMIT_ORGANIZED_JOBS,
-    organized: organized
+    type: POST_EXTRACT_SUBREDDITS,
+    payload: {
+      request: {
+        url: `/extractSubs/${month}/${year}`,
+        method: "POST",
+        data: JSON.stringify(subs) 
+      }
+    }
   };
 }

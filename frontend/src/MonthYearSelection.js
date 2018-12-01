@@ -17,7 +17,7 @@ import {
   Area
 } from "recharts";
 
-let Months = [
+export const Months = [
   "Jan",
   "Feb",
   "Mar",

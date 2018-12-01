@@ -19,10 +19,10 @@ import MonthYearSelector from "./MonthYearSelection";
 import PendingJobsViewer from "./PendingJobsViewer";
 
 import "@blueprintjs/core/lib/css/blueprint.css";
+import { IP } from './index'
 
 import { setSelectedSubreddit, fetchSubreddits } from "./reducer";
-
-export const IP = "localhost";
+import SelectedSubredditViewer from "./SelectedSubredditViewer";
 
 const AppToaster = Toaster.create({
   className: "notifyToaster",
@@ -107,7 +107,7 @@ class App extends Component {
           </div>
           <div style={{ width: "30%", display: "flex", flexDirection: "row" }}>
             {this.state.Status.Extracting ? (
-              <div style={{ width: "30%", height: "20%" }}>
+              <div style={{ width: "20%", height: "20%" }}>
                 <Circle
                   strokeWidth="10"
                   percent={this.state.Status.ExtractProgress}
@@ -119,7 +119,7 @@ class App extends Component {
                 {this.state.Status.ExtractTimeRem ? '~' + this.state.Status.ExtractTimeRem + ' Remaining' : ''}
               </div>
             ) : (
-              <div style={{ width: "30%", height: "20%" }}>
+              <div style={{ width: "20%", height: "20%" }}>
                 <Circle
                   strokeWidth="10"
                   percent={this.state.Status.ExtractProgress}
@@ -143,7 +143,7 @@ class App extends Component {
               </div>
             }
             {this.state.Status.Processing ? (
-              <div style={{ width: "30%", height: "20%" }}>
+              <div style={{ width: "20%", height: "20%" }}>
                 <Circle
                   strokeWidth="10"
                   percent={this.state.Status.ProcessProgress}
@@ -152,7 +152,7 @@ class App extends Component {
                 {this.state.Status.ProcessProgress.toFixed(3)}% Processed
               </div>
             ) : (
-              <div style={{ width: "30%", height: "20%" }}>
+              <div style={{ width: "20%", height: "20%" }}>
                 <Circle
                   strokeWidth="10"
                   percent={this.state.Status.ProcessProgress}
@@ -192,9 +192,12 @@ class App extends Component {
           </div>
         </div>
         <div style={{ display: "flex", flexDirection: "row" }}>
-          <div style={{ width: "50%" }}>{this.displaySubs()}</div>
+          <div style={{ width: "25%" }}>{this.displaySubs()}</div>
           <div style={{ width: "50%" }}>
-            <PendingJobsViewer />
+            <SelectedSubredditViewer/>
+          </div>
+          <div style={{width: "25%"}}>
+          <PendingJobsViewer />
           </div>
         </div>
       </div>

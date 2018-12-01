@@ -1,13 +1,25 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import {Provider} from 'react-redux'
-import { createStore } from 'redux'
+import {createStore, applyMiddleware} from 'redux';
+import axios from 'axios';
+import axiosMiddleware from 'redux-axios-middleware';
 import './index.css';
 import App from './App';
 import * as serviceWorker from './serviceWorker';
 import reducer from './reducer'
 
-const store = createStore(reducer)
+export const IP = "localhost";
+
+const client = axios.create({ //all axios can be used, shown in axios documentation
+  baseURL:'http://' + IP + ':5000/api',
+  responseType: 'json'
+});
+
+const store = createStore(reducer,
+  applyMiddleware(
+    axiosMiddleware(client)
+  ))
 
 ReactDOM.render(
 <Provider store={store}>
