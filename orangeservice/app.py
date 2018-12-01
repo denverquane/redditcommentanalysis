@@ -1,17 +1,17 @@
 from flask import Flask, render_template, flash, redirect, request
 import Orange
 app = Flask(__name__)
-data = Orange.data.Table('../data/2016_50_words_Summary.csv')
-learner = Orange.classification.SimpleRandomForestLearner()
+data = Orange.data.Table('../data/2016_Summary.csv')
+learner = Orange.classification.CN2Learner()
 classifier = learner(data)
 
 c_values = data.domain.class_var.values
-for d in data[5:8]:
+for d in data[12:24]:
     c = classifier(d)
-    print("{}, originally {}".format(c_values[int(classifier(d)[0])],
+    print("Predicted {}, originally {}".format(c_values[int(classifier(d)[0])],
                                      d.get_class()))
 
-res = Orange.evaluation.CrossValidation(data, [learner], k=4)
+res = Orange.evaluation.CrossValidation(data, [learner], k=3)
 print("Accuracy:", Orange.evaluation.scoring.CA(res))
 
 @app.route('/', methods=['GET', 'POST'])

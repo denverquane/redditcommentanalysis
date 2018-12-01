@@ -3,6 +3,7 @@ import { connect } from "react-redux";
 import { Months } from "./MonthYearSelection";
 import { CollapseExample } from "./Collapse";
 import Plot from "react-plotly.js";
+import ComparisonPlot from "./ComparisonPlot";
 
 class SelectedSubredditViewer extends React.Component {
   constructor(props) {
@@ -80,7 +81,7 @@ class SelectedSubredditViewer extends React.Component {
     let max = -100000000;
     for (let moidx in boxplotdata) {
       if (boxplotdata[moidx]) {
-        let datapt = boxplotdata[moidx]
+        let datapt = boxplotdata[moidx];
 
         if (datapt["Karma"].Min < min) {
           min = datapt["Karma"].Min;
@@ -89,64 +90,107 @@ class SelectedSubredditViewer extends React.Component {
           max = datapt["Karma"].Max;
         }
 
-        shapes.push({
-          x0: moidx,
-          x1: moidx + 1,
-          y0: datapt["Karma"].Min,
-          y1: datapt["Karma"].Min,
-          'line': {
-            'color': 'rgb(55, 128, 191)',
-            'width': 3,
-        },
-          type: 'line'
-        });
-        karmaData.push(
-          datapt["Karma"].Average,
-        );
+        // shapes.push(
+        //   {
+        //     x0: moidx,
+        //     x1: moidx + 1,
+        //     y0: datapt["Karma"].Min,
+        //     y1: datapt["Karma"].Min,
+        //     line: {
+        //       color: "rgb(55, 128, 191)",
+        //       width: 3
+        //     },
+        //     type: "line"
+        //   },
+        //   {
+        //     x0: moidx,
+        //     x1: moidx + 1,
+        //     y0: datapt["Karma"].Max,
+        //     y1: datapt["Karma"].Max,
+        //     line: {
+        //       color: "rgb(55, 128, 191)",
+        //       width: 3
+        //     },
+        //     type: "line"
+        //   },
+        //   {
+        //     x0: moidx,
+        //     x1: moidx,
+        //     y0: datapt["Karma"].Median,
+        //     y1: datapt["Karma"].Median,
+        //     line: {
+        //       color: "rgb(0, 0, 0)",
+        //       width: 3
+        //     },
+        //     type: "line"
+        //   }
+        // );
+        karmaData.push(datapt["Karma"].Average);
         // commentData.push(
         //   datapt["TotalComments"],
         // );
-        sentimentData.push(
-          datapt["Sentiment"].Average,
-        );
-        wordlengthData.push(
-          datapt["WordLength"].Average,
-        );
+        sentimentData.push(datapt["Sentiment"].Average);
+        wordlengthData.push(datapt["WordLength"].Average);
       }
     }
     return (
-      <Plot
-        data= {[
-          {
-            x : Months,
-            y: karmaData,
-            name: 'Karma',
-            mode: 'lines',
-            type: 'scatter'
-          },
-          {
-            x : Months,
-            y: wordlengthData,
-            name: 'Comment Word Length',
-            mode: 'lines',
-            type: 'scatter'
-          },
-          {
-            x : Months,
-            y: sentimentData,
-            name: 'Sentiment',
-            mode: 'lines',
-            type: 'scatter'
-          }
-        ]}
-        layout={{
-          width: 800,
-          height: 600,
-          title: "A Fancy Plot",
-          
-          shapes: shapes
-        }}
-      />
+      <div>
+        <Plot
+          data={[
+            {
+              x: Months,
+              y: karmaData,
+              name: "Avg Karma",
+              mode: "lines",
+              type: "scatter"
+            },
+            {
+              x: Months,
+              y: wordlengthData,
+              name: "Avg Comment Word Length",
+              mode: "lines",
+              type: "scatter"
+            }
+          ]}
+          layout={{
+            width: 800,
+            height: 400,
+            title: "A Fancy Plot",
+
+            shapes: shapes
+          }}
+        />
+        <Plot
+          data={[
+            {
+              x: Months,
+              y: sentimentData,
+              name: "Avg Sentiment",
+              mode: "lines",
+              type: "scatter"
+            }
+          ]}
+          layout={{
+            width: 800,
+            height: 400,
+            title: "Sentiment Plot",
+
+            shapes: [
+              {
+                x0: "Jan",
+                x1: "Dec",
+                y0: 0,
+                y1: 0,
+                line: {
+                  color: "rgb(0, 0, 0)",
+                  width: 3
+                },
+                type: "line"
+              }
+            ]
+          }}
+        />
+      </div>
     );
   }
 }

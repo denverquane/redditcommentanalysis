@@ -1,6 +1,7 @@
 import React, { Component } from "react";
 import "./App.css";
 import {
+  Checkbox,
   Button,
   Toaster,
   Position,
@@ -21,8 +22,9 @@ import PendingJobsViewer from "./PendingJobsViewer";
 import "@blueprintjs/core/lib/css/blueprint.css";
 import { IP } from './index'
 
-import { setSelectedSubreddit, fetchSubreddits } from "./reducer";
+import { setSelectedSubreddit, fetchSubreddits, toggleCompareSubreddit } from "./reducer";
 import SelectedSubredditViewer from "./SelectedSubredditViewer";
+import ComparisonPlot from "./ComparisonPlot";
 
 const AppToaster = Toaster.create({
   className: "notifyToaster",
@@ -169,8 +171,7 @@ class App extends Component {
           </div>
         </header>
         <div style={{ width: "100%", display: "flex", flexDirection: "row" }}>
-          <div style={{ width: "25%" }} />
-          <div style={{ width: "35%" }}>
+          <div style={{ width: "16%" }}>
             <InputGroup
               onChange={event =>
                 this.setState({
@@ -180,7 +181,7 @@ class App extends Component {
               }
             />
           </div>
-          <div style={{ width: "20%" }}>
+          <div style={{ width: "10%" }}>
             <Button
               onClick={() => {
                 this.addSubredditEntry(this.state.TempExtractName);
@@ -194,7 +195,7 @@ class App extends Component {
         <div style={{ display: "flex", flexDirection: "row" }}>
           <div style={{ width: "25%" }}>{this.displaySubs()}</div>
           <div style={{ width: "60%" }}>
-            <SelectedSubredditViewer/>
+          <ComparisonPlot/>
           </div>
           <div style={{width: "15%"}}>
           <PendingJobsViewer />
@@ -241,7 +242,13 @@ class App extends Component {
           elevation={Elevation.TWO}
           interactive={true}
         >
-          <h1>{key}</h1>({totalComments.toLocaleString()} total comments)
+          <h1>{key}</h1>
+          <Checkbox 
+          disabled={!this.props.subreddits[key].ProcessedYearMonthCommentSummaries["2016"]}
+          onChange={() => this.props.toggleCompareSubreddit(key)}>
+            Compare 2016
+            </Checkbox>
+          ({totalComments.toLocaleString()} total comments)
           <CollapseExample component={years} typeLabel={"Extraction Details"} />
         </Card>
       );
@@ -292,7 +299,7 @@ class App extends Component {
             <div style={{ width: "10%" }} />
           </div>
         );
-      } else if (arr.length < 10){
+      } else if (arr.length < 5){
         arr.push(
           <div>
             <div style={{ width: "10%" }} />
@@ -302,7 +309,7 @@ class App extends Component {
             <div style={{ width: "10%" }} />
           </div>
         );
-      } else if (i === "10"){
+      } else if (i === "5"){
         arr.push(<div>
             <div style={{ width: "10%" }} />
             <Tag key={i} intent={Intent.NONE} style={{ width: "80%" }}>
@@ -352,6 +359,7 @@ const mapStateToProps = state => ({
 
 const mapDispatchToProps = dispatch => ({
   setSelectedSubreddit: (sub) => dispatch(setSelectedSubreddit(sub)),
+  toggleCompareSubreddit: sub => dispatch(toggleCompareSubreddit(sub)),
   fetchSubreddits: () => dispatch(fetchSubreddits())
 });
 

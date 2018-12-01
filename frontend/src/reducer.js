@@ -1,5 +1,6 @@
 export const ADD_EXTRACT_JOB = "events/ADD_EXTRACT_JOB";
 export const SET_SELECTED_SUBREDDIT = "events/SET_SELECTED_SUBREDDIT";
+export const TOGGLE_COMPARISON_SUBREDDIT = "events/ADD_COMPARISON_SUBREDDIT"
 export const GET_SUBREDDITS = "events/GET_SUBREDDITS";
 export const GET_SUBREDDITS_SUCCESS = "events/GET_SUBREDDITS_SUCCESS";
 
@@ -40,6 +41,24 @@ export default function reducer(state = [], action) {
         ...state,
         selectedSubreddit: action.subreddit
       };
+    
+    case TOGGLE_COMPARISON_SUBREDDIT:
+    let compareSubreddits = [];
+    let removed = false
+      for(let compare in state.compareSubreddits) {
+        if (state.compareSubreddits[compare] === action.subreddit) {
+          removed = true
+        } else {
+          compareSubreddits.push(state.compareSubreddits[compare]);
+        }
+      }
+      if (!removed) {
+        compareSubreddits.push(action.subreddit);
+      }
+      return {
+        ...state,
+        compareSubreddits: compareSubreddits
+      }
 
     case GET_SUBREDDITS:
       return {
@@ -84,6 +103,13 @@ export function setSelectedSubreddit(subreddit) {
     type: SET_SELECTED_SUBREDDIT,
     subreddit: subreddit
   };
+}
+
+export function toggleCompareSubreddit(subreddit) {
+  return {
+    type: TOGGLE_COMPARISON_SUBREDDIT,
+    subreddit: subreddit
+  }
 }
 
 export function fetchSubreddits() {
