@@ -86,6 +86,7 @@ func main() {
 	for yr := range YearsAndMonthsAvailable {
 		//fmt.Println("Checking " + yr)
 		checkForExtractedSubs(yr, "Better")
+		checkForProcessedData(yr)
 	}
 
 	for _, subredditStatus := range subredditStatuses {
@@ -135,18 +136,59 @@ func run(port string) error {
 	return nil
 }
 
+func checkForProcessedData(year string) {
+	yearDirectory := DataDirectory + "/Processed/" + year + "/"
+
+	for _, month := range selection.AllMonths {
+		arr := selection.ScanDirForProcessedSubData(yearDirectory + month) //scan the current Month folder for all subs
+		log.Println("Checking " + year + "/" + month + " for processed data")
+		for _, sub := range arr {
+
+			var subredditSummary selection.ProcessedSubredditStats
+			str := yearDirectory + month + "/" + "subreddit_" + sub
+
+			f, err := os.Open(str)
+			if err != nil {
+				log.Println(err)
+			}
+
+			bytess, err := ioutil.ReadAll(f)
+			if err == nil {
+				err2 := json.Unmarshal(bytess, &subredditSummary)
+				if err2 != nil {
+					panic(err2)
+				}
+			} else {
+				panic(err)
+			}
+
+			f.Close()
+
+			if val, ok := subredditStatuses[sub]; ok {
+				if val.ProcessedYearMonthCommentSummaries[year] == nil {
+					val.ProcessedYearMonthCommentSummaries[year] = make(map[string]selection.ProcessedSubredditStats, 1)
+				}
+				val.ProcessedYearMonthCommentSummaries[year][month] = subredditSummary
+				val.Processed = true
+				subredditStatuses[sub] = val
+			} else {
+				status := subredditStatus{Extracting: false, Extracted: false, ExtractedYearMonthCommentCounts: make(map[string]map[string]int64, 0), Processing: false, Processed: true, ProcessedYearMonthCommentSummaries: make(map[string]map[string]selection.ProcessedSubredditStats, 1)}
+				status.ProcessedYearMonthCommentSummaries[year] = make(map[string]selection.ProcessedSubredditStats, 1)
+				status.ProcessedYearMonthCommentSummaries[year][month] = subredditSummary
+				subredditStatuses[sub] = status
+			}
+		}
+	}
+}
+
 func checkForExtractedSubs(year string, schema string) {
 
 	yearDirectory := DataDirectory + "/Extracted/" + year + "/"
 
 	for _, month := range selection.AllMonths {
 		arr := selection.ScanDirForExtractedSubData(yearDirectory+month, schema) //scan the current Month folder for all subs
-		if len(arr) == 0 {
-
-		}
-
+		log.Println("Checking " + year + "/" + month + " for extracted data")
 		for _, sub := range arr {
-			fmt.Println("Checking " + sub)
 			var commentCount int64
 			str := yearDirectory + month + "/subreddit_" + sub + "_" + schema + "_count"
 			plan, fileOpenErr := ioutil.ReadFile(str)
@@ -489,6 +531,14 @@ func processQueue() {
 		go monitorProgress(&processingProg)
 
 		for _, sub := range tempSub.Subreddits {
+			if subredditStatuses[sub].ProcessedYearMonthCommentSummaries != nil &&
+				subredditStatuses[sub].ProcessedYearMonthCommentSummaries[tempSub.Year] != nil {
+				if _, ok := subredditStatuses[sub].ProcessedYearMonthCommentSummaries[tempSub.Year][tempSub.Month]; ok {
+					log.Println("Subreddit " + sub + " has already been processed! Skipping!")
+					continue
+				}
+			}
+
 			sum := selection.OpenExtractedSubredditDatafile(DataDirectory, tempSub.Month, tempSub.Year, sub, "Better", &processingProg)
 			v := subredditStatuses[sub]
 			v.Processing = false
@@ -505,6 +555,7 @@ func processQueue() {
 
 		processSubQueue = processSubQueue[1:] //done
 		fmt.Println("COMPLETED")
+		checkForProcessedData(tempSub.Year)
 		broadcast <- "fetch"
 	}
 }
