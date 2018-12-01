@@ -4,19 +4,6 @@ import { connect } from "react-redux";
 
 import { addExtractionJob } from "./reducer";
 
-import {
-  AreaChart,
-  LineChart,
-  XAxis,
-  YAxis,
-  Line,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ReferenceLine,
-  Area
-} from "recharts";
-
 export const Months = [
   "Jan",
   "Feb",
@@ -31,20 +18,20 @@ export const Months = [
   "Nov",
   "Dec"
 ];
-let VerboseMonths = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December"
-]
+// let VerboseMonths = [
+//   "January",
+//   "February",
+//   "March",
+//   "April",
+//   "May",
+//   "June",
+//   "July",
+//   "August",
+//   "September",
+//   "October",
+//   "November",
+//   "December"
+// ]
 let state = [];
 
 class MonthYearSelector extends React.Component {
@@ -145,28 +132,6 @@ class MonthYearSelector extends React.Component {
             {arr.slice(8, 12)}
           </div>
         </div>
-        {this.state.Sentiments ? (
-          <AreaChart width={500} height={300} data={data}>
-            <XAxis dataKey="Month"/>
-            <YAxis dataKey="Sentiment" />
-            <CartesianGrid stroke="#eee" strokeDasharray="5 5" />
-            <Line type="monotone" dataKey="Sentiment" stroke="#8884d8" />
-            <ReferenceLine y={0.0} label="Neutral" stroke="blue"/>
-            <Area type="monotone" dataKey="Sentiment" stroke="#8884d8" fill="#8884d8"/>
-            <Legend verticalAlign="top"/>
-            <Tooltip />
-          </AreaChart>
-        ) : (
-          <div />
-        )}
-        <LineChart width={500} height={300} data={data}>
-          <XAxis dataKey="Month"/>
-          <YAxis dataKey="Comments" />
-          <CartesianGrid stroke="#eee" strokeDasharray="5 5" />
-          <Line type="monotone" dataKey="Comments" stroke="#8884d8" />
-          <Tooltip />
-          <Legend verticalAlign="top"/>
-        </LineChart>
         <Button
           onClick={() => {
             for (let mo in this.state.PendingJobs) {

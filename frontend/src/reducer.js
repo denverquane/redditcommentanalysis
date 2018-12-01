@@ -1,5 +1,3 @@
-import { IP } from "./index";
-
 export const ADD_EXTRACT_JOB = "events/ADD_EXTRACT_JOB";
 export const SET_SELECTED_SUBREDDIT = "events/SET_SELECTED_SUBREDDIT";
 export const GET_SUBREDDITS = "events/GET_SUBREDDITS";

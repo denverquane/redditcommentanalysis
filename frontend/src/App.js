@@ -148,7 +148,7 @@ class App extends Component {
                   strokeWidth="10"
                   percent={this.state.Status.ProcessProgress}
                 />
-                "{this.state.Status.ProcessQueue[0]["Subreddit"]}"{" "}
+                "{this.state.Status.ProcessQueue[0]["Month"]}/{this.state.Status.ProcessQueue[0]["Year"]}"{" "}
                 {this.state.Status.ProcessProgress.toFixed(3)}% Processed
               </div>
             ) : (
@@ -193,10 +193,10 @@ class App extends Component {
         </div>
         <div style={{ display: "flex", flexDirection: "row" }}>
           <div style={{ width: "25%" }}>{this.displaySubs()}</div>
-          <div style={{ width: "50%" }}>
+          <div style={{ width: "60%" }}>
             <SelectedSubredditViewer/>
           </div>
-          <div style={{width: "25%"}}>
+          <div style={{width: "15%"}}>
           <PendingJobsViewer />
           </div>
         </div>

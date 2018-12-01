@@ -1,19 +1,8 @@
 import React from "react";
 import { connect } from "react-redux";
-import { Boxplot } from "react-boxplot";
-import {Months} from './MonthYearSelection';
-import {
-  AreaChart,
-  LineChart,
-  XAxis,
-  YAxis,
-  Line,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ReferenceLine,
-  Area
-} from "recharts";
+import { Months } from "./MonthYearSelection";
+import { CollapseExample } from "./Collapse";
+import Plot from "react-plotly.js";
 
 class SelectedSubredditViewer extends React.Component {
   constructor(props) {
@@ -38,101 +27,126 @@ class SelectedSubredditViewer extends React.Component {
   }
 
   render() {
-    return (
+    return this.props.selectedSubreddit ? (
       <div>
         <h1>Selected Subreddit:</h1>
         <h1>{this.props.selectedSubreddit}</h1>
 
-        {this.state.YearMonthProcessSummaries
-          ? this.getBoxplotsForYearAndMonthsByKey(
-              this.state.YearMonthProcessSummaries,
-              "WordLength"
-            )
-          : null}
-        {this.state.YearMonthProcessSummaries
+        {this.state.YearMonthProcessSummaries ? (
+          <div>
+            {/* <CollapseExample
+              component={this.getBoxplotsForYearAndMonthsByKey(
+                this.state.YearMonthProcessSummaries,
+                "WordLength"
+              )}
+              typeLabel="Word Length Boxplot"
+            /> */}
+            {this.getPlotlyBoxPlot(
+              this.state.YearMonthProcessSummaries["2016"]
+            )}
+            {/* <CollapseExample
+              component={this.getBoxplotsForYearAndMonthsByKey(
+                this.state.YearMonthProcessSummaries,
+                "Karma"
+              )}
+              typeLabel="Karma Boxplot"
+            /> */}
+            {/* <CollapseExample
+              component={this.getBoxplotsForYearAndMonthsByKey(
+                this.state.YearMonthProcessSummaries,
+                "Sentiment"
+              )}
+              typeLabel="Sentiment Boxplot"
+            /> */}
+          </div>
+        ) : null}
+        {/* {this.state.YearMonthProcessSummaries
           ? this.getRechartsPlotAcrossMonths(
               this.state.YearMonthProcessSummaries
             )
-          : null}
+          : null} */}
       </div>
-    );
+    ) : null;
   }
 
-  getBoxplotsForYearAndMonthsByKey(yearmonthdata, key) {
-    let plots = [];
+  getPlotlyBoxPlot(boxplotdata) {
+    let shapes = [];
+    let karmaData = [];
+    let commentData = [];
+    let sentimentData = [];
+    let wordlengthData = [];
 
-    for (let yr in yearmonthdata) {
-      plots.push(<h5>{yr}</h5>);
-      for (let mo in Months) {
-        let data = yearmonthdata[yr][Months[mo]];
-        if (data) {
-          plots.push(this.getBoxplot(data[key], Months[mo]));
+    let min = 100000000;
+    let max = -100000000;
+    for (let moidx in boxplotdata) {
+      if (boxplotdata[moidx]) {
+        let datapt = boxplotdata[moidx]
+
+        if (datapt["Karma"].Min < min) {
+          min = datapt["Karma"].Min;
         }
+        if (datapt["Karma"].Max > max) {
+          max = datapt["Karma"].Max;
+        }
+
+        shapes.push({
+          x0: moidx,
+          x1: moidx + 1,
+          y0: datapt["Karma"].Min,
+          y1: datapt["Karma"].Min,
+          'line': {
+            'color': 'rgb(55, 128, 191)',
+            'width': 3,
+        },
+          type: 'line'
+        });
+        karmaData.push(
+          datapt["Karma"].Average,
+        );
+        // commentData.push(
+        //   datapt["TotalComments"],
+        // );
+        sentimentData.push(
+          datapt["Sentiment"].Average,
+        );
+        wordlengthData.push(
+          datapt["WordLength"].Average,
+        );
       }
     }
-    return plots;
-  }
-
-  getBoxplot(boxplotdata, month) {
     return (
-      <div>
-        {month}
-        {": "}
-        {boxplotdata.Min}
-        <Boxplot
-          width={400}
-          height={10}
-          orientation="horizontal"
-          min={boxplotdata.Min}
-          max={boxplotdata.Max}
-          stats={{
-            whiskerLow: boxplotdata.Min,
-            quartile1: boxplotdata.FirstQuartile,
-            quartile2: boxplotdata.Median,
-            quartile3: boxplotdata.ThirdQuartile,
-            whiskerHigh: boxplotdata.Max,
-            outliers: []
-          }}
-        />
-        {boxplotdata.Max}
-      </div>
-    );
-  }
-  getRechartsPlotAcrossMonths(rawData) {
-    let data = [];
-
-    for (let yr in rawData) {
-        for (let mo in Months) {
-            let month = rawData[yr][Months[mo]]
-            if (month){
-                data.push({
-                    Month: Months[mo],
-                    Comments: month.TotalComments,
-                    Sentiment: month.Sentiment.Average,
-                    Karma: month.Karma.Average,
-                    WordLength: month.WordLength.Average
-                })
-            }
-        }
-    }
-    return (
-      <LineChart width={500} height={300} data={data}>
-        <XAxis dataKey="Month" />
-        {/* <YAxis dataKey="Sentiment" /> */}
-        <CartesianGrid stroke="#eee" strokeDasharray="5 5" />
-        <Line type="monotone" dataKey="Sentiment" stroke="#8884d8" />
-        <Line type="monotone" dataKey="Karma" stroke="#8884d8" />
-        <Line type="monotone" dataKey="WordLength" stroke="#8884d8" />
-        {/* <ReferenceLine y={0.0} label="Neutral" stroke="blue" /> */}
-        {/* <Area
-          type="monotone"
-          dataKey="Sentiment"
-          stroke="#8884d8"
-          fill="#8884d8"
-        /> */}
-        <Legend verticalAlign="top" />
-        <Tooltip />
-      </LineChart>
+      <Plot
+        data= {[
+          {
+            x : Months,
+            y: karmaData,
+            name: 'Karma',
+            mode: 'lines',
+            type: 'scatter'
+          },
+          {
+            x : Months,
+            y: wordlengthData,
+            name: 'Comment Word Length',
+            mode: 'lines',
+            type: 'scatter'
+          },
+          {
+            x : Months,
+            y: sentimentData,
+            name: 'Sentiment',
+            mode: 'lines',
+            type: 'scatter'
+          }
+        ]}
+        layout={{
+          width: 800,
+          height: 600,
+          title: "A Fancy Plot",
+          
+          shapes: shapes
+        }}
+      />
     );
   }
 }
