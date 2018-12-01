@@ -40,6 +40,7 @@ func getCommentDataFromLine(line []byte, keyTypes map[string]string) map[string]
 			if key == "body" {
 				result[key] = filter.ReplaceAllString(filterStopWordsFromString(strings.ToLower(fastjson.GetString(line, key))), "")
 				result["sentiment"] = strconv.FormatFloat(GetSentimentForString(os.Getenv("SENTIMENT_IP_AND_PORT"), result[key]), 'f', 10, 64)
+				result["wordlength"] = strconv.FormatInt(int64(len(strings.Fields(fastjson.GetString(line, key)))), 10)
 			} else {
 				result[key] = strings.ToLower(fastjson.GetString(line, key))
 			}
@@ -81,6 +82,16 @@ func GetSentimentForString(url, text string) float64 {
 
 const percentPerMonth = (1.0 / 12.0) * 100.0
 
+type WordRecord struct {
+	Word  string
+	Count int64
+}
+type WordRecordList []WordRecord
+
+func (p WordRecordList) Len() int           { return len(p) }
+func (p WordRecordList) Less(i, j int) bool { return p[i].Count < p[j].Count }
+func (p WordRecordList) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+
 func ExtractCriteriaDataToFile(criteria []Criteria, year, month, basedir string, schema commentSchema, progress *float64, timeRem *string) []int {
 	var commentsInRawFile int64
 
@@ -90,6 +101,7 @@ func ExtractCriteriaDataToFile(criteria []Criteria, year, month, basedir string,
 	outputFileWriters := make([]*os.File, len(criteria))
 	results := make([]int, len(criteria))
 	extractedCommentCounts := make([]int64, len(criteria))
+	//wordOccurrences := make(map[string]int64)
 
 	rawDataFilePath := basedir + "/RC_" + year + monthToIntString(month)
 	commentsInRawFile = readInCommentCountMetadata(rawDataFilePath)

@@ -2,7 +2,7 @@ import React from "react";
 import { connect } from "react-redux";
 import { Card, Intent, Button } from "@blueprintjs/core";
 
-import {submitOrganizedJobs } from './reducer'
+import {postExtractSubreddits } from './reducer'
 
 class PendingJobsViewer extends React.Component {
   constructor(props) {
@@ -42,7 +42,14 @@ class PendingJobsViewer extends React.Component {
       <div>
         <h1>Pending Extraction Request</h1>
         {jobs.length !== 0 ? <Button intent={Intent.SUCCESS} onClick={() => {
-            this.props.submitOrganizedJobs(this.state.organized)
+          for (let yrIdx in this.state.organized) {
+            for (let moIdx in this.state.organized[yrIdx]) {
+              let subs = this.state.organized[yrIdx][moIdx];
+    
+              this.props.postExtractSubreddits(subs, moIdx, yrIdx);
+            }
+          }
+            
         }}>Submit </Button> : <div/> }
         {jobs}
       </div>
@@ -84,12 +91,13 @@ class PendingJobsViewer extends React.Component {
 }
 
 const mapStateToProps = state => ({
-  extractionJobs: state
+  extractionJobs: state.extractionQueue
 });
 
 const mapDispatchToProps = dispatch => ({
   //addExtractionJob: (sub, mo, year) => dispatch(addExtractionJob(sub, mo, year))
-  submitOrganizedJobs: (organized) => dispatch(submitOrganizedJobs(organized))
+  postExtractSubreddits: (subs, month, year) => dispatch(postExtractSubreddits(subs, month, year))
+  
 });
 
 export default connect(

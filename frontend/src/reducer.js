@@ -1,58 +1,75 @@
-import { IP } from './App'
+import { IP } from "./index";
 
-export const ADD_EXTRACT_JOB = 'events/ADD_EXTRACT_JOB';
-export const SUBMIT_ORGANIZED_JOBS = 'events/SUBMIT_ORGANIZED_JOBS'
+export const ADD_EXTRACT_JOB = "events/ADD_EXTRACT_JOB";
+export const SET_SELECTED_SUBREDDIT = "events/SET_SELECTED_SUBREDDIT";
+export const GET_SUBREDDITS = "events/GET_SUBREDDITS";
+export const GET_SUBREDDITS_SUCCESS = "events/GET_SUBREDDITS_SUCCESS";
+
+export const POST_EXTRACT_SUBREDDITS = "events/POST_EXTRACT_SUBREDDITS";
+export const POST_EXTRACT_SUBREDDITS_SUCCESS =
+  "events/POST_EXTRACT_SUBREDDITS_SUCCESS";
 
 export default function reducer(state = [], action) {
   switch (action.type) {
     case ADD_EXTRACT_JOB:
-      let newState = []
-      let found = false
-      for (let job in state) {
-        let j = state[job]
-        if (j.subreddit === action.subreddit && j.month === action.month && j.year === action.year){
-          found = true
+      let newState = JSON.parse(JSON.stringify(state));
+      newState.extractionQueue = [];
+      let found = false;
+      for (let job in state.extractionQueue) {
+        let j = state.extractionQueue[job];
+        if (
+          j.subreddit === action.subreddit &&
+          j.month === action.month &&
+          j.year === action.year
+        ) {
+          found = true;
         } else {
-          newState.push(j)
+          newState.extractionQueue.push(j);
         }
       }
+
       if (!found) {
-        newState.push({
+        newState.extractionQueue.push({
           subreddit: action.subreddit,
           month: action.month,
           year: action.year
-        })
+        });
       }
-      return newState
+      return newState;
 
-    case SUBMIT_ORGANIZED_JOBS: 
-      for (let yrIdx in action.organized){
-        for (let moIdx in action.organized[yrIdx]){
-          let subs = action.organized[yrIdx][moIdx]
+    case SET_SELECTED_SUBREDDIT:
+      return {
+        ...state,
+        selectedSubreddit: action.subreddit
+      };
 
-          extractSubreddits(subs, moIdx, yrIdx)
-        }
+    case GET_SUBREDDITS:
+      return {
+        ...state,
+        loadingSubs: true
+      };
+    case GET_SUBREDDITS_SUCCESS:
+      return {
+        ...state,
+        loadingSubs: false,
+        subreddits: action.payload.data
+      };
+    case POST_EXTRACT_SUBREDDITS: 
+      return {
+        ...state,
+        postingExtract: true
       }
-      return []
+
+    case POST_EXTRACT_SUBREDDITS_SUCCESS: 
+      return {
+        ...state,
+        postingExtract: false,
+        extractionQueue: []
+      }
+
     default:
       return state;
   }
-}
-
-function extractSubreddits(subs, month, year) {
-  fetch(
-    "http://" + IP + ":5000/api/extractSubs/" + month + "/" + year,
-    {
-      method: "post",
-      body: JSON.stringify(subs)
-    }
-  )
-    .then(results => {
-      return results;
-    })
-    .then(data => {
-      console.log(data);
-    });
 }
 
 export function addExtractionJob(subreddit, month, year) {
@@ -64,9 +81,33 @@ export function addExtractionJob(subreddit, month, year) {
   };
 }
 
-export function submitOrganizedJobs(organized) {
+export function setSelectedSubreddit(subreddit) {
   return {
-    type: SUBMIT_ORGANIZED_JOBS,
-    organized: organized
+    type: SET_SELECTED_SUBREDDIT,
+    subreddit: subreddit
+  };
+}
+
+export function fetchSubreddits() {
+  return {
+    type: GET_SUBREDDITS,
+    payload: {
+      request: {
+        url: "/subs"
+      }
+    }
+  };
+}
+
+export function postExtractSubreddits(subs, month, year) {
+  return {
+    type: POST_EXTRACT_SUBREDDITS,
+    payload: {
+      request: {
+        url: `/extractSubs/${month}/${year}`,
+        method: "POST",
+        data: JSON.stringify(subs) 
+      }
+    }
   };
 }

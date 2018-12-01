@@ -13,13 +13,16 @@ import {
 } from "@blueprintjs/core";
 import { Circle } from "rc-progress";
 import Sockette from "sockette";
+import { connect } from "react-redux";
 import { CollapseExample } from "./Collapse";
 import MonthYearSelector from "./MonthYearSelection";
 import PendingJobsViewer from "./PendingJobsViewer";
 
 import "@blueprintjs/core/lib/css/blueprint.css";
+import { IP } from './index'
 
-export const IP = "localhost";
+import { setSelectedSubreddit, fetchSubreddits } from "./reducer";
+import SelectedSubredditViewer from "./SelectedSubredditViewer";
 
 const AppToaster = Toaster.create({
   className: "notifyToaster",
@@ -36,7 +39,7 @@ class App extends Component {
         message: "Connected to Backend!",
         intent: Intent.SUCCESS
       });
-      this.getSubs();
+      this.props.fetchSubreddits();
       this.getStatus();
       this.setState({ ...this.state, Websocket: true });
     },
@@ -44,7 +47,7 @@ class App extends Component {
       console.log("Received:", e);
       console.log(String(e.data));
       if (String(e.data).includes("fetch")) {
-        this.getSubs();
+        this.props.fetchSubreddits();
         this.getStatus();
         console.log("Fetch message");
       } else if (String(e.data).includes("status")) {
@@ -76,7 +79,6 @@ class App extends Component {
   });
   state = {
     Websocket: Boolean,
-    Subs: Object,
     Status: Object,
     TempExtractName: String
   };
@@ -84,7 +86,10 @@ class App extends Component {
     super();
     this.state.Websocket = false;
     this.getStatus();
-    this.getSubs();
+  }
+
+  componentDidMount() {
+    this.props.fetchSubreddits();
   }
 
   render() {
@@ -102,7 +107,7 @@ class App extends Component {
           </div>
           <div style={{ width: "30%", display: "flex", flexDirection: "row" }}>
             {this.state.Status.Extracting ? (
-              <div style={{ width: "30%", height: "20%" }}>
+              <div style={{ width: "20%", height: "20%" }}>
                 <Circle
                   strokeWidth="10"
                   percent={this.state.Status.ExtractProgress}
@@ -114,7 +119,7 @@ class App extends Component {
                 {this.state.Status.ExtractTimeRem ? '~' + this.state.Status.ExtractTimeRem + ' Remaining' : ''}
               </div>
             ) : (
-              <div style={{ width: "30%", height: "20%" }}>
+              <div style={{ width: "20%", height: "20%" }}>
                 <Circle
                   strokeWidth="10"
                   percent={this.state.Status.ExtractProgress}
@@ -138,7 +143,7 @@ class App extends Component {
               </div>
             }
             {this.state.Status.Processing ? (
-              <div style={{ width: "30%", height: "20%" }}>
+              <div style={{ width: "20%", height: "20%" }}>
                 <Circle
                   strokeWidth="10"
                   percent={this.state.Status.ProcessProgress}
@@ -147,7 +152,7 @@ class App extends Component {
                 {this.state.Status.ProcessProgress.toFixed(3)}% Processed
               </div>
             ) : (
-              <div style={{ width: "30%", height: "20%" }}>
+              <div style={{ width: "20%", height: "20%" }}>
                 <Circle
                   strokeWidth="10"
                   percent={this.state.Status.ProcessProgress}
@@ -187,9 +192,12 @@ class App extends Component {
           </div>
         </div>
         <div style={{ display: "flex", flexDirection: "row" }}>
-          <div style={{ width: "50%" }}>{this.displaySubs()}</div>
+          <div style={{ width: "25%" }}>{this.displaySubs()}</div>
           <div style={{ width: "50%" }}>
-            <PendingJobsViewer />
+            <SelectedSubredditViewer/>
+          </div>
+          <div style={{width: "25%"}}>
+          <PendingJobsViewer />
           </div>
         </div>
       </div>
@@ -198,10 +206,11 @@ class App extends Component {
 
   displaySubs() {
     let arr = [];
-    for (let key in this.state.Subs) {
+    console.log(this.props.subreddits);
+    for (let key in this.props.subreddits) {
       let years = [];
       let totalComments = 0;
-      let substatus = this.state.Subs[key];
+      let substatus = this.props.subreddits[key];
 
       for (let yr in substatus["ExtractedYearMonthCommentCounts"]) {
         for (let month in substatus["ExtractedYearMonthCommentCounts"][yr]) {
@@ -221,6 +230,7 @@ class App extends Component {
       }
       arr.push(
         <Card
+          onClick={() => {this.props.setSelectedSubreddit(key)}}
           key={key}
           style={{
             display: "flex",
@@ -248,19 +258,6 @@ class App extends Component {
       return 0;
     });
     return arr;
-  }
-
-  getSubs() {
-    fetch("http://" + IP + ":5000/api/subs")
-      .then(results => {
-        return results.json();
-      })
-      .then(data => {
-        if (JSON.stringify(this.state.Subs) !== JSON.stringify(data)) {
-          // console.log('Updated');
-          this.setState({ ...this.state, Subs: data });
-        }
-      });
   }
 
   getStatus() {
@@ -343,9 +340,22 @@ class App extends Component {
         return results;
       })
       .then(data => {
-        this.getSubs();
+        this.props.fetchSubreddits();
       });
   }
 }
 
-export default App;
+const mapStateToProps = state => ({
+  selectedSubreddit: state.selectedSubreddit,
+  subreddits: state.subreddits
+});
+
+const mapDispatchToProps = dispatch => ({
+  setSelectedSubreddit: (sub) => dispatch(setSelectedSubreddit(sub)),
+  fetchSubreddits: () => dispatch(fetchSubreddits())
+});
+
+export default connect(
+  mapStateToProps,
+  mapDispatchToProps
+)(App);
