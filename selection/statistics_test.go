@@ -1,6 +1,7 @@
 package selection
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -42,4 +43,8 @@ func TestMin(t *testing.T) {
 	if Min(data) != -1000.0 {
 		t.Fail()
 	}
+}
+
+func TestGetPolarityAndSubjectivityForString(t *testing.T) {
+	fmt.Println(GetPolarityAndSubjectivityForString("http://192.168.1.192:8889/api", "you don't want mexico at least then you would get some decent foodd"))
 }

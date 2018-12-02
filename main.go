@@ -85,7 +85,7 @@ func main() {
 
 	for yr := range YearsAndMonthsAvailable {
 		//fmt.Println("Checking " + yr)
-		checkForExtractedSubs(yr, "Better")
+		checkForExtractedSubs(yr, "Best")
 		checkForProcessedData(yr)
 	}
 
@@ -455,7 +455,7 @@ func extractQueue() {
 			criterias[i].Test = "subreddit"
 		}
 		summary := selection.ExtractCriteriaDataToFile(criterias, tempSub.Year, tempSub.Month,
-			DataDirectory, selection.BetterSchema, &extractingProg, &extractTimeRemaining)
+			DataDirectory, selection.BestSchema, &extractingProg, &extractTimeRemaining)
 
 		for i, sub := range tempSub.Subreddits {
 			v := subredditStatuses[sub]
@@ -473,7 +473,7 @@ func extractQueue() {
 
 		extractSubQueue = extractSubQueue[1:] //done
 		fmt.Println("COMPLETED")
-		checkForExtractedSubs(tempSub.Year, "Better")
+		checkForExtractedSubs(tempSub.Year, "Best")
 		broadcast <- "fetch"
 	}
 }
@@ -539,7 +539,7 @@ func processQueue() {
 				}
 			}
 
-			sum := selection.OpenExtractedSubredditDatafile(DataDirectory, tempSub.Month, tempSub.Year, sub, "Better", &processingProg)
+			sum := selection.OpenExtractedSubredditDatafile(DataDirectory, tempSub.Month, tempSub.Year, sub, "Best", &processingProg)
 			v := subredditStatuses[sub]
 			v.Processing = false
 			v.Processed = true

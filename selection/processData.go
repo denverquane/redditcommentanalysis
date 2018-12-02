@@ -19,7 +19,8 @@ const TenMillion = 10000000
 
 type ProcessedSubredditStats struct {
 	TotalComments int64
-	Sentiment     BoxPlotStatistics
+	Polarity      BoxPlotStatistics
+	Subjectivity  BoxPlotStatistics
 	WordLength    BoxPlotStatistics
 	Karma         BoxPlotStatistics
 }
@@ -43,7 +44,8 @@ func OpenExtractedSubredditDatafile(basedir, month, year, subreddit, extractedTy
 		log.Println("File has 0 comments; can't process!")
 		return retSummary
 	}
-	sentiments := make([]float64, totalLines)
+	polarity := make([]float64, totalLines)
+	subjectivity := make([]float64, totalLines)
 	wordLength := make([]float64, totalLines)
 	karmas := make([]float64, totalLines)
 
@@ -68,7 +70,8 @@ func OpenExtractedSubredditDatafile(basedir, month, year, subreddit, extractedTy
 		//header.WriteString("iS#month,")
 		header.WriteString("mD#wordLength,")
 		header.WriteString("mD#karma,")
-		header.WriteString("mC#sentiment\n")
+		header.WriteString("mC#polarity,")
+		header.WriteString("mC#subjectivity\n")
 		classFile.Write(header.Bytes())
 
 	} else {
@@ -86,11 +89,12 @@ func OpenExtractedSubredditDatafile(basedir, month, year, subreddit, extractedTy
 			if err != nil {
 				log.Fatal(err)
 			}
-			sentiments[lines], err = strconv.ParseFloat(tempComment["sentiment"], 64)
+			polarity[lines], err = strconv.ParseFloat(tempComment["polarity"], 64)
+			subjectivity[lines], err = strconv.ParseFloat(tempComment["subjectivity"], 64)
 			wordLength[lines], err = strconv.ParseFloat(tempComment["wordlength"], 64)
 			karmas[lines], err = strconv.ParseFloat(tempComment["score"], 64)
 
-			DumpLineToClassificationFile(subreddit, wordLength[lines], karmas[lines], sentiments[lines], classFile)
+			DumpLineToClassificationFile(subreddit, wordLength[lines], karmas[lines], polarity[lines], subjectivity[lines], classFile)
 			//dump to file here
 		}
 		lines++
@@ -101,14 +105,16 @@ func OpenExtractedSubredditDatafile(basedir, month, year, subreddit, extractedTy
 
 	retSummary.TotalComments = int64(totalLines)
 	retSummary.WordLength = GetBoxPlotStats(wordLength)
-	retSummary.Sentiment = GetBoxPlotStats(sentiments)
+	retSummary.Polarity = GetBoxPlotStats(polarity)
+	retSummary.Subjectivity = GetBoxPlotStats(subjectivity)
 	retSummary.Karma = GetBoxPlotStats(karmas)
 
-	DumpProcessedToCSV(basedir, month, year, subreddit, retSummary)
+	//DumpProcessedToCSV(basedir, month, year, subreddit, retSummary)
 	MarshalToOutputFile(basedir, month, year, subreddit, retSummary)
 	return retSummary
 }
 
+//TODO Broken!!!
 func DumpProcessedToCSV(basedir, month, year, subreddit string, processedStats ProcessedSubredditStats) bool {
 	//filesystem.CreateSubdirectoryStructure("Processed", basedir, month, year)
 	if !filesystem.DoesFolderExist(basedir + "/Processed") {
@@ -171,8 +177,8 @@ func DumpProcessedToCSV(basedir, month, year, subreddit string, processedStats P
 	buffer.WriteString(strconv.FormatFloat(processedStats.WordLength.Median, 'f', 10, 64) + ",")
 	buffer.WriteString(strconv.FormatFloat(processedStats.Karma.Average, 'f', 10, 64) + ",")
 	buffer.WriteString(strconv.FormatFloat(processedStats.Karma.Median, 'f', 10, 64) + ",")
-	buffer.WriteString(strconv.FormatFloat(processedStats.Sentiment.Average, 'f', 10, 64) + ",")
-	buffer.WriteString(strconv.FormatFloat(processedStats.Sentiment.Median, 'f', 10, 64) + ",")
+	//buffer.WriteString(strconv.FormatFloat(processedStats.Sentiment.Average, 'f', 10, 64) + ",")
+	//buffer.WriteString(strconv.FormatFloat(processedStats.Sentiment.Median, 'f', 10, 64) + ",")
 	buffer.WriteString("\n")
 
 	file.Write(buffer.Bytes())
@@ -180,12 +186,13 @@ func DumpProcessedToCSV(basedir, month, year, subreddit string, processedStats P
 	return false
 }
 
-func DumpLineToClassificationFile(sub string, wordLength, karma, sentiment float64, file *os.File) {
+func DumpLineToClassificationFile(sub string, wordLength, karma, polarity, subjectivity float64, file *os.File) {
 	var buffer bytes.Buffer
 	buffer.WriteString(sub + ",")
 	buffer.WriteString(strconv.FormatFloat(wordLength, 'f', 0, 64) + ",")
 	buffer.WriteString(strconv.FormatFloat(karma, 'f', 0, 64) + ",")
-	buffer.WriteString(strconv.FormatFloat(sentiment, 'f', 10, 64))
+	buffer.WriteString(strconv.FormatFloat(polarity, 'f', 10, 64) + ",")
+	buffer.WriteString(strconv.FormatFloat(subjectivity, 'f', 10, 64))
 	buffer.WriteString("\n")
 	file.Write(buffer.Bytes())
 }

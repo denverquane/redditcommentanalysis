@@ -16,8 +16,8 @@ var commentFields = map[string]string{
 //	name:   "Basic",
 //	schema: commentFields,
 //}
-var BetterSchema = commentSchema{
-	name:   "Better",
+var BestSchema = commentSchema{
+	name:   "Best",
 	schema: commentFields,
 }
 

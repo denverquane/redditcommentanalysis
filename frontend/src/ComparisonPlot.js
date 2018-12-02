@@ -5,6 +5,8 @@ import { CollapseExample } from "./Collapse";
 import { toggleCompareSubreddit } from "./reducer";
 import Plot from "react-plotly.js";
 
+const YEAR = "2010"
+
 class ComparisonPlot extends React.Component {
   constructor(props) {
     super(props);
@@ -18,7 +20,8 @@ class ComparisonPlot extends React.Component {
 
   render() {
     let karmaArrayData = [];
-    let sentimentArrayData = [];
+    let polarityArrayData = [];
+    let subjArrayData = [];
     let commentLengthArrayData = [];
     let commentsArrayData = [];
 
@@ -30,10 +33,11 @@ class ComparisonPlot extends React.Component {
         this.props.subreddits[index].ProcessedYearMonthCommentSummaries
       ) {
         let extractedInfo = this.props.subreddits[index]
-          .ProcessedYearMonthCommentSummaries["2016"];
+          .ProcessedYearMonthCommentSummaries[YEAR];
         if (extractedInfo) {
             let karmasubData = [];
-            let sentimentsubData = [];
+            let polaritysubData = [];
+            let subjsubData = [];
             let commentLengthsubData = [];
             let commentssubData = [];
 
@@ -42,7 +46,8 @@ class ComparisonPlot extends React.Component {
               let monthData = extractedInfo[mo];
               if (monthData) {
                 karmasubData.push(monthData["Karma"].Average);
-                sentimentsubData.push(monthData["Sentiment"].Average);
+                polaritysubData.push(monthData["Polarity"].Average);
+                subjsubData.push(monthData["Subjectivity"].Average);
                 commentLengthsubData.push(monthData["WordLength"].Average);
                 commentssubData.push(monthData["TotalComments"]);
 
@@ -56,9 +61,16 @@ class ComparisonPlot extends React.Component {
             mode: "lines",
             type: "scatter"
           });
-          sentimentArrayData.push({
+          polarityArrayData.push({
             x: Months,
-            y: sentimentsubData,
+            y: polaritysubData,
+            name: index,
+            mode: "lines",
+            type: "scatter"
+          });
+          subjArrayData.push({
+            x: Months,
+            y: subjsubData,
             name: index,
             mode: "lines",
             type: "scatter"
@@ -87,7 +99,7 @@ class ComparisonPlot extends React.Component {
           layout={{
             width: 900,
             height: 450,
-            title: "2016 Total Comments",
+            title: YEAR+" Total Comments",
 
             shapes: {}
           }}
@@ -97,17 +109,27 @@ class ComparisonPlot extends React.Component {
           layout={{
             width: 900,
             height: 450,
-            title: "2016 Average Karma",
+            title: YEAR+ " Average Karma",
 
             shapes: {}
           }}
         />
         <Plot
-          data={sentimentArrayData}
+          data={polarityArrayData}
           layout={{
             width: 900,
             height: 450,
-            title: "2016 Average Sentiment",
+            title: YEAR + " Average Sentiment",
+
+            shapes: {}
+          }}
+        />
+        <Plot
+          data={subjArrayData}
+          layout={{
+            width: 900,
+            height: 450,
+            title: YEAR + " Average Subjectivity",
 
             shapes: {}
           }}
@@ -117,7 +139,7 @@ class ComparisonPlot extends React.Component {
           layout={{
             width: 900,
             height: 450,
-            title: "2016 Average Comment Word Length",
+            title: YEAR + " Average Comment Word Length",
 
             shapes: {}
           }}

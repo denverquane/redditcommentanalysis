@@ -5,6 +5,8 @@ import { CollapseExample } from "./Collapse";
 import Plot from "react-plotly.js";
 import ComparisonPlot from "./ComparisonPlot";
 
+const YEAR = "2010"
+
 class SelectedSubredditViewer extends React.Component {
   constructor(props) {
     super(props);
@@ -43,7 +45,7 @@ class SelectedSubredditViewer extends React.Component {
               typeLabel="Word Length Boxplot"
             /> */}
             {this.getPlotlyBoxPlot(
-              this.state.YearMonthProcessSummaries["2016"]
+              this.state.YearMonthProcessSummaries[YEAR]
             )}
             {/* <CollapseExample
               component={this.getBoxplotsForYearAndMonthsByKey(
@@ -129,7 +131,7 @@ class SelectedSubredditViewer extends React.Component {
         // commentData.push(
         //   datapt["TotalComments"],
         // );
-        sentimentData.push(datapt["Sentiment"].Average);
+        sentimentData.push(datapt["Polarity"].Average);
         wordlengthData.push(datapt["WordLength"].Average);
       }
     }
@@ -165,7 +167,7 @@ class SelectedSubredditViewer extends React.Component {
             {
               x: Months,
               y: sentimentData,
-              name: "Avg Sentiment",
+              name: "Avg Polarity",
               mode: "lines",
               type: "scatter"
             }
@@ -173,7 +175,7 @@ class SelectedSubredditViewer extends React.Component {
           layout={{
             width: 800,
             height: 400,
-            title: "Sentiment Plot",
+            title: "Polarity Plot",
 
             shapes: [
               {
