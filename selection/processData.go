@@ -51,6 +51,31 @@ func OpenExtractedSubredditDatafile(basedir, month, year, subreddit, extractedTy
 	extractedDataFileReader := bufio.NewReaderSize(extractedDataFile, 4096)
 
 	lines := 0
+	filesystem.CreateSubdirectoryStructure("Processed", basedir, month, year)
+
+	// Opening a file is a huge bottleneck, so just create/open it once and hand it around
+	classFileStr := basedir + "/Processed/" + year + "/" + month + "/classification.csv"
+	var classFile *os.File
+
+	if !filesystem.DoesFileExist(classFileStr) {
+		classFile, err = os.Create(classFileStr)
+
+		if err != nil {
+			panic(err)
+		}
+		var header bytes.Buffer
+		header.WriteString("cD#subreddit,")
+		//header.WriteString("iS#month,")
+		header.WriteString("mD#wordLength,")
+		header.WriteString("mD#karma,")
+		header.WriteString("mC#sentiment\n")
+		classFile.Write(header.Bytes())
+
+	} else {
+		classFile, err = os.OpenFile(classFileStr, os.O_RDWR|os.O_APPEND, 0660)
+	}
+	defer classFile.Close()
+
 	for {
 		var tempComment map[string]string
 		line := recurseBuildCompleteLine(extractedDataFileReader)
@@ -64,6 +89,9 @@ func OpenExtractedSubredditDatafile(basedir, month, year, subreddit, extractedTy
 			sentiments[lines], err = strconv.ParseFloat(tempComment["sentiment"], 64)
 			wordLength[lines], err = strconv.ParseFloat(tempComment["wordlength"], 64)
 			karmas[lines], err = strconv.ParseFloat(tempComment["score"], 64)
+
+			DumpLineToClassificationFile(subreddit, wordLength[lines], karmas[lines], sentiments[lines], classFile)
+			//dump to file here
 		}
 		lines++
 		*progress = 100.0 * (float64(lines) / float64(totalLines))
@@ -81,7 +109,7 @@ func OpenExtractedSubredditDatafile(basedir, month, year, subreddit, extractedTy
 	return retSummary
 }
 
-func DumpProcessedToCSV(basedir, month, year, subreddit string, processedStats ProcessedSubredditStats) {
+func DumpProcessedToCSV(basedir, month, year, subreddit string, processedStats ProcessedSubredditStats) bool {
 	//filesystem.CreateSubdirectoryStructure("Processed", basedir, month, year)
 	if !filesystem.DoesFolderExist(basedir + "/Processed") {
 		filesystem.CreateFolder(basedir + "/Processed")
@@ -111,7 +139,7 @@ func DumpProcessedToCSV(basedir, month, year, subreddit string, processedStats P
 				if entries[0] == subreddit && entries[1] == month {
 					log.Println("Processed sub data already in file, exiting!")
 					file.Close()
-					return
+					return true
 				}
 			}
 		}
@@ -149,6 +177,17 @@ func DumpProcessedToCSV(basedir, month, year, subreddit string, processedStats P
 
 	file.Write(buffer.Bytes())
 	file.Close()
+	return false
+}
+
+func DumpLineToClassificationFile(sub string, wordLength, karma, sentiment float64, file *os.File) {
+	var buffer bytes.Buffer
+	buffer.WriteString(sub + ",")
+	buffer.WriteString(strconv.FormatFloat(wordLength, 'f', 0, 64) + ",")
+	buffer.WriteString(strconv.FormatFloat(karma, 'f', 0, 64) + ",")
+	buffer.WriteString(strconv.FormatFloat(sentiment, 'f', 10, 64))
+	buffer.WriteString("\n")
+	file.Write(buffer.Bytes())
 }
 
 func MarshalToOutputFile(basedir, month, year, subreddit string, processedStats ProcessedSubredditStats) {
