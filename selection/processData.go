@@ -16,6 +16,7 @@ import (
 const HundredThousand = 100000
 const OneMillion = 1000000
 const TenMillion = 10000000
+const SampleComments = 40000
 
 type ProcessedSubredditStats struct {
 	TotalComments int64
@@ -23,6 +24,7 @@ type ProcessedSubredditStats struct {
 	Subjectivity  BoxPlotStatistics
 	WordLength    BoxPlotStatistics
 	Karma         BoxPlotStatistics
+	Diversity     float64
 }
 
 func OpenExtractedSubredditDatafile(basedir, month, year, subreddit, extractedType string, progress *float64) ProcessedSubredditStats {
@@ -44,6 +46,9 @@ func OpenExtractedSubredditDatafile(basedir, month, year, subreddit, extractedTy
 		log.Println("File has 0 comments; can't process!")
 		return retSummary
 	}
+
+	diversity := GetWordDiversity(SampleComments, totalLines, extractedDataFile)
+	fmt.Println("Word diversity for " + subreddit + " is " + strconv.FormatFloat(diversity, 'f', 10, 64))
 	polarity := make([]float64, totalLines)
 	subjectivity := make([]float64, totalLines)
 	wordLength := make([]float64, totalLines)
@@ -108,10 +113,53 @@ func OpenExtractedSubredditDatafile(basedir, month, year, subreddit, extractedTy
 	retSummary.Polarity = GetBoxPlotStats(polarity)
 	retSummary.Subjectivity = GetBoxPlotStats(subjectivity)
 	retSummary.Karma = GetBoxPlotStats(karmas)
+	retSummary.Diversity = diversity
 
 	//DumpProcessedToCSV(basedir, month, year, subreddit, retSummary)
 	MarshalToOutputFile(basedir, month, year, subreddit, retSummary)
 	return retSummary
+}
+
+func GetWordDiversity(numComments, totalComments int, file *os.File) float64 {
+	file.Seek(0, 0)
+	fileReader := bufio.NewReaderSize(file, 4096)
+	lines := 0
+	divider := int(float64(totalComments) / float64(numComments))
+	allWords := make(map[string]int64)
+	totalWords := 0
+	sampled := 0
+	wordLengths := make([]float64, numComments)
+	for {
+		var tempComment map[string]string
+		line := recurseBuildCompleteLine(fileReader)
+		if line == nil || sampled == numComments {
+			break
+		} else if lines%divider == 0 {
+			err := json.Unmarshal(line, &tempComment)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			body, _ := tempComment["body"]
+			words := strings.Fields(body)
+			wordLengths[sampled] = float64(len(words))
+			for _, v := range words { //all the words of the comment
+				totalWords++
+				if count, ok := allWords[v]; ok { //if we've seen the word before
+					allWords[v] = count + 1
+				} else if !strings.Contains(v, "http") {
+					allWords[v] = 1 //haven't seen this word before
+				}
+			}
+			sampled++
+		}
+		lines++
+	}
+	uniqueWords := len(allWords)
+
+	fmt.Println(strconv.Itoa(uniqueWords) + " unique words, " + strconv.Itoa(totalWords) + " total words")
+
+	return float64(uniqueWords) / float64(numComments)
 }
 
 //TODO Broken!!!
