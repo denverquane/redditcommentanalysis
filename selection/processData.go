@@ -125,6 +125,9 @@ func GetWordDiversity(numComments, totalComments int, file *os.File) float64 {
 	fileReader := bufio.NewReaderSize(file, 4096)
 	lines := 0
 	divider := int(float64(totalComments) / float64(numComments))
+	if divider == 0 {
+		divider = 1
+	}
 	allWords := make(map[string]int64)
 	totalWords := 0
 	sampled := 0
@@ -159,7 +162,8 @@ func GetWordDiversity(numComments, totalComments int, file *os.File) float64 {
 
 	fmt.Println(strconv.Itoa(uniqueWords) + " unique words, " + strconv.Itoa(totalWords) + " total words")
 
-	return float64(uniqueWords) / float64(numComments)
+	fmt.Println("Sampled " + strconv.Itoa(sampled) + " comments")
+	return float64(uniqueWords) / float64(sampled)
 }
 
 //TODO Broken!!!

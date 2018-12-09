@@ -9,7 +9,7 @@ import App from './App';
 import * as serviceWorker from './serviceWorker';
 import reducer from './reducer'
 
-export const IP = "localhost";
+export const IP = "dquane.com";
 
 const client = axios.create({ //all axios can be used, shown in axios documentation
   baseURL:'http://' + IP + ':5000/api',

@@ -5,7 +5,7 @@ import { CollapseExample } from "./Collapse";
 import { toggleCompareSubreddit } from "./reducer";
 import Plot from "react-plotly.js";
 
-const YEAR = "2010"
+const YEAR = "2016"
 
 class ComparisonPlot extends React.Component {
   constructor(props) {
