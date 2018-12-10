@@ -17,7 +17,6 @@ import Sockette from "sockette";
 import { connect } from "react-redux";
 import { CollapseExample } from "./Collapse";
 import MonthYearSelector from "./MonthYearSelection";
-import PendingJobsViewer from "./PendingJobsViewer";
 
 import "@blueprintjs/core/lib/css/blueprint.css";
 import { IP } from "./index";

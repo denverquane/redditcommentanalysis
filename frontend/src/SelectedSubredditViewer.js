@@ -1,15 +1,10 @@
 import React from "react";
 import { connect } from "react-redux";
 import { Months } from "./MonthYearSelection";
-import { CollapseExample } from "./Collapse";
-import Plot from "react-plotly.js";
-import ComparisonPlot from "./ComparisonPlot";
 import { Boxplot } from "react-boxplot";
 import {
   Card
 } from "@blueprintjs/core";
-
-const YEAR = "2016";
 
 class SelectedSubredditViewer extends React.Component {
   constructor(props) {

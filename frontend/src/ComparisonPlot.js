@@ -1,7 +1,6 @@
 import React from "react";
 import { connect } from "react-redux";
 import { Months } from "./MonthYearSelection";
-import { CollapseExample } from "./Collapse";
 import { toggleCompareSubreddit } from "./reducer";
 import Plot from "react-plotly.js";
 

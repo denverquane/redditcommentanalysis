@@ -130,7 +130,7 @@ export function postExtractSubreddits(subs, month, year) {
       request: {
         url: `/extractSubs/${month}/${year}`,
         method: "POST",
-        data: JSON.stringify(subs) 
+        data: JSON.stringify(subs)
       }
     }
   };

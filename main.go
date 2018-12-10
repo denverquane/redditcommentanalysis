@@ -56,6 +56,8 @@ type subredditStatus struct {
 var DataDirectory string
 var ServerPort string
 var YearsAndMonthsAvailable map[string][]string
+var AuthUsername string
+var AuthPassword string
 
 func main() {
 
@@ -72,6 +74,9 @@ func main() {
 	} else {
 		DataDirectory = os.Getenv("BASE_DATA_DIRECTORY")
 		ServerPort = os.Getenv("SERVER_PORT")
+		AuthUsername = os.Getenv("AUTHUSERNAME")
+		AuthPassword = os.Getenv("AUTHPASSWORD")
+		fmt.Println("user: " + AuthUsername + ", pass: " + AuthPassword)
 	}
 
 	YearsAndMonthsAvailable = selection.ListYearsAndMonthsForExtractionInDir(DataDirectory)
@@ -263,12 +268,11 @@ func makeMuxRouter() http.Handler {
 	muxRouter.HandleFunc("/api", handleIndex).Methods("GET")
 	muxRouter.HandleFunc("/api/status", handleStatus).Methods("GET", "OPTIONS")
 	muxRouter.HandleFunc("/api/subs", handleGetSubs).Methods("GET")
-	muxRouter.HandleFunc("/api/extractSubs/{Month}/{Year}", handleExtractSubs).Methods("POST")
+	//muxRouter.HandleFunc("/api/extractSubs/{Month}/{Year}", handleExtractSubs).Methods("POST")
 	muxRouter.HandleFunc("/api/status/{Subreddit}", handleViewStatus).Methods("GET")
 	muxRouter.HandleFunc("/api/processSub/{Subreddit}/{Month}/{Year}", handleProcessSub).Methods("POST")
 	//muxRouter.HandleFunc("/api/combineProcessed/{Year}", combineProcessed).Methods("POST")
-	muxRouter.HandleFunc("/api/addSubEntry/{Subreddit}", addSubredditEntry).Methods("POST")
-	muxRouter.HandleFunc("/api/mockStatus", handleMockStatus).Methods("GET")
+	//muxRouter.HandleFunc("/api/addSubEntry/{Subreddit}", addSubredditEntry).Methods("POST")
 	muxRouter.HandleFunc("/ws", handleConnections)
 	return muxRouter
 }
@@ -322,14 +326,6 @@ func handleMessages() {
 			}
 		}
 	}
-}
-
-func handleMockStatus(w http.ResponseWriter, r *http.Request) {
-	//writeStdHeaders(w)
-	//status := ServerStatus{true, 65.67895, []string{"sample", "sample2"},
-	//	true, 77.5678, []string{"sample3", "sample4"}}
-	//bytes, _ := json.Marshal(status)
-	//io.WriteString(w, string(bytes))
 }
 
 type ServerStatus struct {
@@ -400,6 +396,12 @@ func handleExtractSubs(w http.ResponseWriter, r *http.Request) {
 	month := vars["Month"]
 	year := vars["Year"]
 	writeStdHeaders(w)
+
+	user, pass, ok := r.BasicAuth()
+	if !ok || user != AuthUsername || pass != AuthPassword {
+		http.Error(w, "Not authorized", 401)
+		return
+	}
 
 	decoder := json.NewDecoder(r.Body)
 
@@ -486,6 +488,12 @@ func handleProcessSub(w http.ResponseWriter, r *http.Request) {
 	override := false
 
 	writeStdHeaders(w)
+	user, pass, ok := r.BasicAuth()
+	if !ok || user != AuthUsername || pass != AuthPassword {
+		http.Error(w, "Not authorized", 401)
+		return
+	}
+
 	if val, ok := subredditStatuses[subreddit]; ok {
 		if val.Extracting {
 			io.WriteString(w, "Subreddit \""+subreddit+"\" is still being extracted")
@@ -578,6 +586,12 @@ func addSubredditEntry(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	subreddit := vars["Subreddit"]
 
+	user, pass, ok := r.BasicAuth()
+	if !ok || user != AuthUsername || pass != AuthPassword {
+		http.Error(w, "Not authorized", 401)
+		return
+	}
+
 	if _, ok := subredditStatuses[subreddit]; !ok {
 		subredditStatuses[subreddit] = subredditStatus{Extracting: false, ExtractedYearMonthCommentCounts: make(map[string]map[string]int64, 0), Processing: false, ProcessedYearMonthCommentSummaries: make(map[string]map[string]selection.ProcessedSubredditStats, 0)}
 		for yearIdx, monthsAvailableArray := range YearsAndMonthsAvailable {
@@ -600,13 +614,10 @@ func addSubredditEntry(w http.ResponseWriter, r *http.Request) {
 					subredditStatuses[subreddit].ExtractedYearMonthCommentCounts[yearIdx][month] = -1
 					//fmt.Println("Marked " + yearIdx + "/" + month + " as unavailable")
 				}
-
 			}
-
 		}
 		io.WriteString(w, "{}")
 	}
-
 }
 
 func handleViewStatus(w http.ResponseWriter, r *http.Request) {
