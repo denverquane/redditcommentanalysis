@@ -24,6 +24,7 @@ class ComparisonPlot extends React.Component {
     let subjArrayData = [];
     let commentLengthArrayData = [];
     let commentsArrayData = [];
+    let diversityArrayData = [];
 
     for (let sub in this.props.compareSubreddits) {
       //loop over the subs we have to compare
@@ -40,6 +41,7 @@ class ComparisonPlot extends React.Component {
             let subjsubData = [];
             let commentLengthsubData = [];
             let commentssubData = [];
+            let diversitysubData = [];
 
           for (let mo in extractedInfo) {
             if (extractedInfo[mo]) {
@@ -50,7 +52,7 @@ class ComparisonPlot extends React.Component {
                 subjsubData.push(monthData["Subjectivity"].Average);
                 commentLengthsubData.push(monthData["WordLength"].Average);
                 commentssubData.push(monthData["TotalComments"]);
-
+                diversitysubData.push(monthData["Diversity"]);
               }
             }
           }
@@ -89,6 +91,13 @@ class ComparisonPlot extends React.Component {
             mode: "lines",
             type: "scatter"
           });
+          diversityArrayData.push({
+            x: Months,
+            y: diversitysubData,
+            name: index,
+            mode: "lines",
+            type: "scatter"
+          })
         }
       }
     }
@@ -140,6 +149,16 @@ class ComparisonPlot extends React.Component {
             width: 900,
             height: 450,
             title: YEAR + " Average Comment Word Length",
+
+            shapes: {}
+          }}
+        />
+        <Plot
+          data={diversityArrayData}
+          layout={{
+            width: 900,
+            height: 450,
+            title: YEAR + " Average Unique Words per Comment",
 
             shapes: {}
           }}
