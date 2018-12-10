@@ -9894,6 +9894,13 @@ react-app-polyfill@^0.1.3:
     raf "3.4.0"
     whatwg-fetch "3.0.0"
 
+react-boxplot@^2.0.0:
+  version "2.0.0"
+  resolved "https://registry.yarnpkg.com/react-boxplot/-/react-boxplot-2.0.0.tgz#ee51e5fa434cd1440f59e42b4301ece9b3860466"
+  integrity sha512-ofSS4aTCEV5/vISxHejOv9QVMh+mWz03jTWVS4ZD4WyHSrpbsyqFiPbDJ8IxRihUvhVs2J9L7XfBlOF1RJb8dw==
+  dependencies:
+    simple-statistics "^6.1.1"
+
 react-dev-utils@^6.0.5:
   version "6.0.5"
   resolved "https://registry.yarnpkg.com/react-dev-utils/-/react-dev-utils-6.0.5.tgz#6ef34d0a416dc1c97ac20025031ea1f0d819b21d"
@@ -10980,6 +10987,11 @@ signum@^1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/signum/-/signum-1.0.0.tgz#74a7d2bf2a20b40eba16a92b152124f1d559fa77"
   integrity sha1-dKfSvyogtA66FqkrFSEk8dVZ+nc=
+
+simple-statistics@^6.1.1:
+  version "6.1.1"
+  resolved "https://registry.yarnpkg.com/simple-statistics/-/simple-statistics-6.1.1.tgz#e3a0799ffc49914d6f421c5a4ac585f6a13e2bad"
+  integrity sha512-zGwn0DDRa9Zel4H4n2pjTFIyGoAGpnpjrGIctreCxj5XWrcx9v7Xy7270FkC967WMmcvuc8ZU7m0ZG+hGN7gAA==
 
 simple-swizzle@^0.2.2:
   version "0.2.2"

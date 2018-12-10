@@ -20,9 +20,13 @@ import MonthYearSelector from "./MonthYearSelection";
 import PendingJobsViewer from "./PendingJobsViewer";
 
 import "@blueprintjs/core/lib/css/blueprint.css";
-import { IP } from './index'
+import { IP } from "./index";
 
-import { setSelectedSubreddit, fetchSubreddits, toggleCompareSubreddit } from "./reducer";
+import {
+  setSelectedSubreddit,
+  fetchSubreddits,
+  toggleCompareSubreddit
+} from "./reducer";
 import SelectedSubredditViewer from "./SelectedSubredditViewer";
 import ComparisonPlot from "./ComparisonPlot";
 
@@ -82,11 +86,13 @@ class App extends Component {
   state = {
     Websocket: Boolean,
     Status: Object,
-    TempExtractName: String
+    TempExtractName: String,
+    FullsizeCharts: Boolean
   };
   constructor() {
     super();
     this.state.Websocket = false;
+    this.state.FullsizeCharts = false;
     this.getStatus();
   }
 
@@ -116,9 +122,13 @@ class App extends Component {
                 />
                 {this.state.Status.ExtractQueue[0]["Month"]}{" "}
                 {this.state.Status.ExtractQueue[0]["Year"]}{" "}
-                {this.state.Status.ExtractProgress ? 
-                    this.state.Status.ExtractProgress.toFixed(3) + '% Extracted ' : 'Extracting...'}
-                {this.state.Status.ExtractTimeRem ? '~' + this.state.Status.ExtractTimeRem + ' Remaining' : ''}
+                {this.state.Status.ExtractProgress
+                  ? this.state.Status.ExtractProgress.toFixed(3) +
+                    "% Extracted "
+                  : "Extracting..."}
+                {this.state.Status.ExtractTimeRem
+                  ? "~" + this.state.Status.ExtractTimeRem + " Remaining"
+                  : ""}
               </div>
             ) : (
               <div style={{ width: "20%", height: "20%" }}>
@@ -150,7 +160,8 @@ class App extends Component {
                   strokeWidth="10"
                   percent={this.state.Status.ProcessProgress}
                 />
-                "{this.state.Status.ProcessQueue[0]["Month"]}/{this.state.Status.ProcessQueue[0]["Year"]}"{" "}
+                "{this.state.Status.ProcessQueue[0]["Month"]}/
+                {this.state.Status.ProcessQueue[0]["Year"]}"{" "}
                 {this.state.Status.ProcessProgress.toFixed(3)}% Processed
               </div>
             ) : (
@@ -194,12 +205,50 @@ class App extends Component {
         </div>
         <div style={{ display: "flex", flexDirection: "row" }}>
           <div style={{ width: "25%" }}>{this.displaySubs()}</div>
-          <div style={{ width: "60%" }}>
-          <ComparisonPlot/>
-          </div>
-          <div style={{width: "15%"}}>
-          <PendingJobsViewer />
-          </div>
+          {this.state.FullsizeCharts ? (
+            <div
+              style={{ width: "75%", display: "flex", flexDirection: "column" }}
+            >
+              <Button
+              style={{width: 200}}
+                onClick={() => {
+                  this.setState({
+                    ...this.state,
+                    FullsizeCharts: !this.state.FullsizeCharts
+                  });
+                }}
+              >
+               {this.state.FullsizeCharts ? 'Show' : 'Hide'} BoxPlots
+              </Button>
+              <ComparisonPlot fullSize={this.state.FullsizeCharts}/>
+            </div>
+          ) : (
+            <div style={{ width: "75%", display: 'flex', flexDirection: 'row' }}>
+              <div
+                style={{
+                  width: "66%",
+                  display: "flex",
+                  flexDirection: "column"
+                }}
+              >
+                <Button
+                  style={{width: 200}}
+                  onClick={() => {
+                    this.setState({
+                      ...this.state,
+                      FullsizeCharts: !this.state.FullsizeCharts
+                    });
+                  }}
+                >
+                  {this.state.FullsizeCharts ? 'Show' : 'Hide'} BoxPlots
+                </Button>
+                <ComparisonPlot fullSize={this.state.FullsizeCharts}/>
+              </div>
+              <div style={{ width: "33%" }}>
+                <SelectedSubredditViewer/>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -231,7 +280,9 @@ class App extends Component {
       }
       arr.push(
         <Card
-          onClick={() => {this.props.setSelectedSubreddit(key)}}
+          onClick={() => {
+            this.props.setSelectedSubreddit(key);
+          }}
           key={key}
           style={{
             display: "flex",
@@ -243,11 +294,16 @@ class App extends Component {
           interactive={true}
         >
           <h1>{key}</h1>
-          <Checkbox 
-          disabled={!this.props.subreddits[key].ProcessedYearMonthCommentSummaries["2016"]}
-          onChange={() => this.props.toggleCompareSubreddit(key)}>
+          <Checkbox
+            disabled={
+              !this.props.subreddits[key].ProcessedYearMonthCommentSummaries[
+                "2016"
+              ]
+            }
+            onChange={() => this.props.toggleCompareSubreddit(key)}
+          >
             Compare 2016
-            </Checkbox>
+          </Checkbox>
           ({totalComments.toLocaleString()} total comments)
           <CollapseExample component={years} typeLabel={"Extraction Details"} />
         </Card>
@@ -294,29 +350,33 @@ class App extends Component {
               intent={Intent.SUCCESS}
               style={{ width: "80%", marginBottom: "1%" }}
             >
-              {i}. {queue[i]["Month"]}/{queue[i]["Year"]}{" "}{queue[i]["Subreddits"].join(',')}
+              {i}. {queue[i]["Month"]}/{queue[i]["Year"]}{" "}
+              {queue[i]["Subreddits"].join(",")}
             </Tag>
             <div style={{ width: "10%" }} />
           </div>
         );
-      } else if (arr.length < 5){
+      } else if (arr.length < 5) {
         arr.push(
           <div>
             <div style={{ width: "10%" }} />
             <Tag key={i} intent={Intent.NONE} style={{ width: "80%" }}>
-            {i}. {queue[i]["Month"]}/{queue[i]["Year"]}{" "}{queue[i]["Subreddits"].join(',')}
+              {i}. {queue[i]["Month"]}/{queue[i]["Year"]}{" "}
+              {queue[i]["Subreddits"].join(",")}
             </Tag>
             <div style={{ width: "10%" }} />
           </div>
         );
-      } else if (i === "5"){
-        arr.push(<div>
+      } else if (i === "5") {
+        arr.push(
+          <div>
             <div style={{ width: "10%" }} />
             <Tag key={i} intent={Intent.NONE} style={{ width: "80%" }}>
-            ...
+              ...
             </Tag>
             <div style={{ width: "10%" }} />
-          </div>);
+          </div>
+        );
       }
     }
     return arr;
@@ -358,7 +418,7 @@ const mapStateToProps = state => ({
 });
 
 const mapDispatchToProps = dispatch => ({
-  setSelectedSubreddit: (sub) => dispatch(setSelectedSubreddit(sub)),
+  setSelectedSubreddit: sub => dispatch(setSelectedSubreddit(sub)),
   toggleCompareSubreddit: sub => dispatch(toggleCompareSubreddit(sub)),
   fetchSubreddits: () => dispatch(fetchSubreddits())
 });

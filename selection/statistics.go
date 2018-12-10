@@ -1,6 +1,12 @@
 package selection
 
-import "math"
+import (
+	"math"
+)
+
+///
+// IMPORTANT: These don't sort by default!!!!
+///
 
 type BoxPlotStatistics struct {
 	Min           float64
@@ -71,27 +77,11 @@ func Max(floats []float64) float64 {
 }
 
 func Q1(floats []float64) float64 {
-	medianIndex := len(floats) / 2
+	medianIndex := int(math.Ceil(float64(len(floats)) / 2.0))
 	return Median(floats[:medianIndex])
 }
 
 func Q3(floats []float64) float64 {
-	medianIndex := len(floats) / 2
+	medianIndex := int(math.Floor(float64(len(floats)) / 2.0))
 	return Median(floats[medianIndex:])
-}
-
-func Outliers(floats []float64) []float64 {
-	outliers := make([]float64, 0)
-	q1 := Q1(floats)
-	q3 := Q3(floats)
-	outerfence := (q3 - q1) * 4.5
-	lowOuterFence := q1 - outerfence
-	highOuterFence := q3 + outerfence
-
-	for _, v := range floats {
-		if v > highOuterFence || v < lowOuterFence {
-			outliers = append(outliers, v)
-		}
-	}
-	return outliers
 }

@@ -13,12 +13,12 @@ func TestAverage(t *testing.T) {
 }
 
 func TestMedian(t *testing.T) {
-	data := []float64{0.0, 2.0, 3.0, 4.0, 20.0}
-	if Median(data) != 3.0 {
+	data := []float64{-20.0, -2.0, -1.0, 4.0, 20.0}
+	if Median(data) != -1.0 {
 		t.Fail()
 	}
-	data2 := []float64{0.0, 2.0, 3.0, 3.5, 4.0, 20.0}
-	if Median(data2) != 3.25 {
+	data2 := []float64{0.0, 2.0, -4.0, 4.0, 4.0, 20.0}
+	if Median(data2) != 0.0 {
 		t.Fail()
 	}
 }
@@ -41,6 +41,22 @@ func TestMax(t *testing.T) {
 func TestMin(t *testing.T) {
 	data := []float64{-1000.0, 2.0, 3000.0, 4.0, 20.0}
 	if Min(data) != -1000.0 {
+		t.Fail()
+	}
+}
+
+func TestQ1(t *testing.T) {
+	data := []float64{-1000.0, 2.0, 3000.0, 4.0, 20.0}
+	fmt.Println(Q1(data))
+	if Q1(data) != 2.0 {
+		t.Fail()
+	}
+}
+
+func TestQ3(t *testing.T) {
+	data := []float64{-1000.0, -800.0, -600.0, 4.0, 5.0, 20.0}
+	fmt.Println(Q3(data))
+	if Q3(data) != 5.0 {
 		t.Fail()
 	}
 }

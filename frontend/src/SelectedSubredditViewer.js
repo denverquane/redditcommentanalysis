@@ -4,8 +4,12 @@ import { Months } from "./MonthYearSelection";
 import { CollapseExample } from "./Collapse";
 import Plot from "react-plotly.js";
 import ComparisonPlot from "./ComparisonPlot";
+import { Boxplot } from "react-boxplot";
+import {
+  Card
+} from "@blueprintjs/core";
 
-const YEAR = "2010"
+const YEAR = "2016";
 
 class SelectedSubredditViewer extends React.Component {
   constructor(props) {
@@ -35,163 +39,93 @@ class SelectedSubredditViewer extends React.Component {
         <h1>Selected Subreddit:</h1>
         <h1>{this.props.selectedSubreddit}</h1>
 
-        {this.state.YearMonthProcessSummaries ? (
+        {this.state.YearMonthProcessSummaries && this.state.YearMonthProcessSummaries["2016"] ? (
           <div>
-            {/* <CollapseExample
-              component={this.getBoxplotsForYearAndMonthsByKey(
-                this.state.YearMonthProcessSummaries,
-                "WordLength"
-              )}
-              typeLabel="Word Length Boxplot"
-            /> */}
-            {this.getPlotlyBoxPlot(
-              this.state.YearMonthProcessSummaries[YEAR]
+            <Card>
+              <h3>Karma:</h3>
+              {this.getBoxplotsForMonthsByKey(
+              this.state.YearMonthProcessSummaries["2016"],
+              "Karma"
             )}
-            {/* <CollapseExample
-              component={this.getBoxplotsForYearAndMonthsByKey(
-                this.state.YearMonthProcessSummaries,
-                "Karma"
-              )}
-              typeLabel="Karma Boxplot"
-            /> */}
-            {/* <CollapseExample
-              component={this.getBoxplotsForYearAndMonthsByKey(
-                this.state.YearMonthProcessSummaries,
-                "Sentiment"
-              )}
-              typeLabel="Sentiment Boxplot"
-            /> */}
+            </Card>
+            <Card>
+              <h3>Sentiment:</h3>
+              {this.getBoxplotsForMonthsByKey(
+              this.state.YearMonthProcessSummaries["2016"],
+              "Polarity"
+            )}
+            </Card>
+            <Card>
+              <h3>Subjectivity:</h3>
+              {this.getBoxplotsForMonthsByKey(
+              this.state.YearMonthProcessSummaries["2016"],
+              "Subjectivity"
+            )}
+            </Card>
+            <Card>
+              <h3>Comment Length:</h3>
+              {this.getBoxplotsForMonthsByKey(
+              this.state.YearMonthProcessSummaries["2016"],
+              "WordLength"
+            )}
+            </Card>
           </div>
         ) : null}
-        {/* {this.state.YearMonthProcessSummaries
-          ? this.getRechartsPlotAcrossMonths(
-              this.state.YearMonthProcessSummaries
-            )
-          : null} */}
+      
       </div>
     ) : null;
   }
+  getBoxplotsForMonthsByKey(yeardata, key) {
+    let plots = [];
+    let absMin = 10000000;
+    let absMax = -10000000;
 
-  getPlotlyBoxPlot(boxplotdata) {
-    let shapes = [];
-    let karmaData = [];
-    let commentData = [];
-    let sentimentData = [];
-    let wordlengthData = [];
-
-    let min = 100000000;
-    let max = -100000000;
-    for (let moidx in boxplotdata) {
-      if (boxplotdata[moidx]) {
-        let datapt = boxplotdata[moidx];
-
-        if (datapt["Karma"].Min < min) {
-          min = datapt["Karma"].Min;
+    for (let mo in Months) {
+      let data = yeardata[Months[mo]];
+      if (data) {
+        if (data[key].Min < absMin) {
+          absMin = data[key].Min;
         }
-        if (datapt["Karma"].Max > max) {
-          max = datapt["Karma"].Max;
+        if (data[key].Max > absMax) {
+          absMax = data[key].Max;
         }
-
-        // shapes.push(
-        //   {
-        //     x0: moidx,
-        //     x1: moidx + 1,
-        //     y0: datapt["Karma"].Min,
-        //     y1: datapt["Karma"].Min,
-        //     line: {
-        //       color: "rgb(55, 128, 191)",
-        //       width: 3
-        //     },
-        //     type: "line"
-        //   },
-        //   {
-        //     x0: moidx,
-        //     x1: moidx + 1,
-        //     y0: datapt["Karma"].Max,
-        //     y1: datapt["Karma"].Max,
-        //     line: {
-        //       color: "rgb(55, 128, 191)",
-        //       width: 3
-        //     },
-        //     type: "line"
-        //   },
-        //   {
-        //     x0: moidx,
-        //     x1: moidx,
-        //     y0: datapt["Karma"].Median,
-        //     y1: datapt["Karma"].Median,
-        //     line: {
-        //       color: "rgb(0, 0, 0)",
-        //       width: 3
-        //     },
-        //     type: "line"
-        //   }
-        // );
-        karmaData.push(datapt["Karma"].Average);
-        // commentData.push(
-        //   datapt["TotalComments"],
-        // );
-        sentimentData.push(datapt["Polarity"].Average);
-        wordlengthData.push(datapt["WordLength"].Average);
       }
     }
+
+    for (let mo in Months) {
+      let data = yeardata[Months[mo]];
+      if (data) {
+        plots.push(this.getBoxplot(data[key], Months[mo], absMin, absMax));
+      }
+    }
+
+    return plots;
+  }
+
+  getBoxplot(boxplotdata, month, min, max) {
     return (
-      <div>
-        <Plot
-          data={[
-            {
-              x: Months,
-              y: karmaData,
-              name: "Avg Karma",
-              mode: "lines",
-              type: "scatter"
-            },
-            {
-              x: Months,
-              y: wordlengthData,
-              name: "Avg Comment Word Length",
-              mode: "lines",
-              type: "scatter"
-            }
-          ]}
-          layout={{
-            width: 800,
-            height: 400,
-            title: "A Fancy Plot",
-
-            shapes: shapes
-          }}
-        />
-        <Plot
-          data={[
-            {
-              x: Months,
-              y: sentimentData,
-              name: "Avg Polarity",
-              mode: "lines",
-              type: "scatter"
-            }
-          ]}
-          layout={{
-            width: 800,
-            height: 400,
-            title: "Polarity Plot",
-
-            shapes: [
-              {
-                x0: "Jan",
-                x1: "Dec",
-                y0: 0,
-                y1: 0,
-                line: {
-                  color: "rgb(0, 0, 0)",
-                  width: 3
-                },
-                type: "line"
-              }
-            ]
-          }}
-        />
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", flexDirection: "row" }}>
+          <div style={{ backgroundColor: "#cccccc" }}>
+            <Boxplot
+              width={400}
+              height={15}
+              orientation="horizontal"
+              min={min}
+              max={max}
+              stats={{
+                whiskerLow: boxplotdata.Min,
+                quartile1: boxplotdata.FirstQuartile,
+                quartile2: boxplotdata.Median,
+                quartile3: boxplotdata.ThirdQuartile,
+                whiskerHigh: boxplotdata.Max,
+                outliers: []
+              }}
+            />
+          </div>
+          {month}
+        </div>
+        Min:{boxplotdata.Min}, Q1: {boxplotdata.FirstQuartile}, Median: {boxplotdata.Median}, Q3: {boxplotdata.ThirdQuartile}, Max: {boxplotdata.Max}
       </div>
     );
   }

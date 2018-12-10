@@ -11,11 +11,14 @@ class ComparisonPlot extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
+      fullSize: props.fullSize
     };
   }
 
   componentWillReceiveProps(props) {
-
+    if (props.fullSize !== this.state.fullSize) {
+      this.setState({fullSize: props.fullSize})
+    }
   }
 
   render() {
@@ -102,7 +105,7 @@ class ComparisonPlot extends React.Component {
       }
     }
     return (
-      <div>
+      <div style={{width: '100%', display: 'flex', flexDirection: 'column'}}>
         <Plot
           data={commentsArrayData}
           layout={{

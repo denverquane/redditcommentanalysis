@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -48,7 +49,7 @@ func OpenExtractedSubredditDatafile(basedir, month, year, subreddit, extractedTy
 	}
 
 	diversity := GetWordDiversity(SampleComments, totalLines, extractedDataFile)
-	fmt.Println("Word diversity for " + subreddit + " is " + strconv.FormatFloat(diversity, 'f', 10, 64))
+	//fmt.Println("Word diversity for " + subreddit + " is " + strconv.FormatFloat(diversity, 'f', 10, 64))
 	polarity := make([]float64, totalLines)
 	subjectivity := make([]float64, totalLines)
 	wordLength := make([]float64, totalLines)
@@ -109,10 +110,17 @@ func OpenExtractedSubredditDatafile(basedir, month, year, subreddit, extractedTy
 	fmt.Println(strconv.Itoa(totalLines) + " total comments")
 
 	retSummary.TotalComments = int64(totalLines)
+
+	sort.Float64s(karmas)
+	sort.Float64s(wordLength)
+	sort.Float64s(polarity)
+	sort.Float64s(subjectivity)
+
 	retSummary.WordLength = GetBoxPlotStats(wordLength)
 	retSummary.Polarity = GetBoxPlotStats(polarity)
 	retSummary.Subjectivity = GetBoxPlotStats(subjectivity)
 	retSummary.Karma = GetBoxPlotStats(karmas)
+
 	retSummary.Diversity = diversity
 
 	//DumpProcessedToCSV(basedir, month, year, subreddit, retSummary)
@@ -160,9 +168,9 @@ func GetWordDiversity(numComments, totalComments int, file *os.File) float64 {
 	}
 	uniqueWords := len(allWords)
 
-	fmt.Println(strconv.Itoa(uniqueWords) + " unique words, " + strconv.Itoa(totalWords) + " total words")
-
-	fmt.Println("Sampled " + strconv.Itoa(sampled) + " comments")
+	//fmt.Println(strconv.Itoa(uniqueWords) + " unique words, " + strconv.Itoa(totalWords) + " total words")
+	//
+	//fmt.Println("Sampled " + strconv.Itoa(sampled) + " comments")
 	return float64(uniqueWords) / float64(sampled)
 }
 
