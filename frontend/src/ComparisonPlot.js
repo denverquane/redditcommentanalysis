@@ -106,60 +106,42 @@ class ComparisonPlot extends React.Component {
         <Plot
           data={commentsArrayData}
           layout={{
-            width: 900,
-            height: 450,
             title: YEAR+" Total Comments",
-
             shapes: {}
           }}
         />
         <Plot
           data={karmaArrayData}
           layout={{
-            width: 900,
-            height: 450,
             title: YEAR+ " Average Karma",
-
             shapes: {}
           }}
         />
         <Plot
           data={polarityArrayData}
           layout={{
-            width: 900,
-            height: 450,
             title: YEAR + " Average Sentiment",
-
             shapes: {}
           }}
         />
         <Plot
           data={subjArrayData}
           layout={{
-            width: 900,
-            height: 450,
             title: YEAR + " Average Subjectivity",
-
             shapes: {}
           }}
         />
         <Plot
           data={commentLengthArrayData}
           layout={{
-            width: 900,
-            height: 450,
-            title: YEAR + " Average Comment Word Length",
-
+            title: YEAR + " Average Comment Length, in Words",
             shapes: {}
           }}
         />
         <Plot
           data={diversityArrayData}
           layout={{
-            width: 900,
-            height: 450,
             title: YEAR + " Average Unique Words per Comment",
-
             shapes: {}
           }}
         />
