@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"github.com/denverquane/redditcommentanalysis/selection"
@@ -55,6 +56,7 @@ type subredditStatus struct {
 
 var DataDirectory string
 var ServerPort string
+var CertDirectory string
 var YearsAndMonthsAvailable map[string][]string
 
 func main() {
@@ -72,6 +74,8 @@ func main() {
 	} else {
 		DataDirectory = os.Getenv("BASE_DATA_DIRECTORY")
 		ServerPort = os.Getenv("SERVER_PORT")
+		CertDirectory = os.Getenv("CERT_DIRECTORY")
+		log.Println("Cert directory: " + CertDirectory)
 	}
 
 	YearsAndMonthsAvailable = selection.ListYearsAndMonthsForExtractionInDir(DataDirectory)
@@ -118,11 +122,18 @@ func main() {
 }
 
 func run(port string) error {
+	cer, err := tls.LoadX509KeyPair(CertDirectory+"/fullchain.pem", CertDirectory+"/privkey.pem")
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
 	handler := makeMuxRouter()
 
 	s := &http.Server{
-		Addr:           ":" + port,
+		Addr:           ":https",
 		Handler:        handler,
+		TLSConfig:      &tls.Config{Certificates: []tls.Certificate{cer}},
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   10 * time.Second,
 		MaxHeaderBytes: 1 << 20,
@@ -130,9 +141,10 @@ func run(port string) error {
 
 	go handleMessages()
 
-	if err := s.ListenAndServe(); err != nil {
-		return err
-	}
+	go http.ListenAndServe(":80", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "https://"+r.Host+r.URL.String(), http.StatusMovedPermanently)
+	}))
+	log.Fatal(s.ListenAndServeTLS("", "")) //Key and cert are already set in the TLS config
 	return nil
 }
 
